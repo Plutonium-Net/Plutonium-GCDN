@@ -15,7 +15,6 @@
   function sendSnapshot() {
     try {
       var saves = snapshot();
-      console.log('[plu-sync] sending snapshot —', Object.keys(saves).length, 'key(s)');
       window.parent.postMessage({ plu: true, type: 'plu_sync_data', saves: saves }, '*');
     } catch (_) {}
   }
@@ -24,11 +23,9 @@
     if (!saves) return;
     try {
       var keys = Object.keys(saves);
-      console.log('[plu-sync] restoring', keys.length, 'key(s):', keys);
       for (var i = 0; i < keys.length; i++) {
         localStorage.setItem(keys[i], saves[keys[i]]);
       }
-      console.log('[plu-sync] restore complete');
     } catch (_) {}
   }
 
@@ -65,7 +62,6 @@
     if (e.data.type === 'plu_sync_request') sendSnapshot();
   });
 
-  console.log('[plu-sync] ready');
   try {
     window.parent.postMessage({ plu: true, type: 'plu_sync_ready' }, '*');
   } catch (_) {}
