@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plutonium GCDN</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --pink: #e8175d;
+      --pink-muted: #a81145;
+      --bg: #000000;
+      --text: #ffffff;
+      --muted: #a0a0a0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.6;
+    }
+
+    .hero {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 200px 0 0 16vw;
+    }
+
+    .hero__inner {
+      max-width: 600px;
+    }
+
+    .hero__title {
+      font-size: clamp(2.4rem, 5vw, 3.6rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--pink);
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }
+
+    .hero__desc {
+      font-size: clamp(1rem, 2vw, 1.15rem);
+      color: var(--muted);
+      max-width: 480px;
+      line-height: 1.7;
+      margin-bottom: 40px;
+    }
+
+    /* ── Content sections ── */
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section__heading {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--pink);
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+
+    /* ── Structure block ── */
+    pre {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(232,23,93,0.15);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      overflow-x: auto;
+      line-height: 1.7;
+    }
+
+    /* ── Table ── */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 480px;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 7px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    th {
+      color: var(--pink);
+      font-weight: 600;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    td {
+      color: var(--muted);
+    }
+
+    td code {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* ── Steps list ── */
+    ol {
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    ol li {
+      margin-bottom: 6px;
+    }
+
+    ol li code {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    /* ── Footer link ── */
+    .license-link {
+      color: var(--pink);
+      text-decoration: none;
+      font-size: 0.88rem;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+
+    .license-link:hover {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero__inner">
+      <h1 class="hero__title">Plutonium GCDN</h1>
+      <p class="hero__desc">A collection of browser-playable games, served as standalone HTML files via a CDN-friendly directory structure.</p>
+
+      <div class="section">
+        <div class="section__heading">Structure</div>
+        <pre>/
+├── config.json       # Game registry (names, paths, metadata)
+└── games/            # One .html file per game
+    ├── cookie-clicker.html
+    ├── minecraft-1.5.2.html
+    └── ...</pre>
+      </div>
+
+      <div class="section">
+        <div class="section__heading">config.json fields</div>
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>URL-safe slug matching the filename</td></tr>
+            <tr><td><code>name</code></td><td>Human-readable display name</td></tr>
+            <tr><td><code>path</code></td><td>Relative path to the game's HTML file</td></tr>
+            <tr><td><code>image</code></td><td>Relative path to the game's thumbnail</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section__heading">Adding a Game</div>
+        <ol>
+          <li>Drop the self-contained <code>.html</code> file into <code>games/</code>.</li>
+          <li>Add a corresponding entry to the <code>games</code> array in <code>config.json</code>.</li>
+        </ol>
+      </div>
+
+      <div class="section">
+        <a href="LICENSE" class="license-link">License</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
