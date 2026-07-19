@@ -44,8 +44,11 @@
 
   function sendSnapshot() {
     try {
+      var saves = snapshot();
+      var count = Object.keys(saves).length;
+      console.log('[plu-sync] sending snapshot —', count, 'key(s)');
       window.parent.postMessage(
-        { plu: true, type: 'plu_sync_data', saves: snapshot() },
+        { plu: true, type: 'plu_sync_data', saves: saves },
         '*'
       );
     } catch (_) {}
@@ -55,18 +58,22 @@
     if (!saves) return;
     try {
       var keys = Object.keys(saves);
+      console.log('[plu-sync] restoring', keys.length, 'key(s):', keys);
       for (var i = 0; i < keys.length; i++) {
         localStorage.setItem(keys[i], saves[keys[i]]);
       }
+      console.log('[plu-sync] restore complete');
     } catch (_) {}
   }
 
-  /* ── Debounced auto-push on any localStorage write ─────────────────────── */
+  /* ── Auto-push: debounce on write + fixed 10-second interval ───────────── */
   var _debounce = null;
   function scheduleSnapshot() {
     clearTimeout(_debounce);
     _debounce = setTimeout(sendSnapshot, 800);
   }
+
+  setInterval(sendSnapshot, 10000);
 
   /* ── Intercept localStorage writes ─────────────────────────────────────── */
   var _origSetItem    = Storage.prototype.setItem;
@@ -102,6 +109,7 @@
   });
 
   /* ── Announce ready to parent so it can push pre-fetched saves ──────────── */
+  console.log('[plu-sync] ready');
   try {
     window.parent.postMessage({ plu: true, type: 'plu_sync_ready' }, '*');
   } catch (_) {}
