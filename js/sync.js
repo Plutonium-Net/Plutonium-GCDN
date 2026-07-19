@@ -73,7 +73,7 @@
     _debounce = setTimeout(sendSnapshot, 800);
   }
 
-  setInterval(sendSnapshot, 10000);
+  setInterval(sendSnapshot, 1000);
 
   /* ── Intercept localStorage writes ─────────────────────────────────────── */
   var _origSetItem    = Storage.prototype.setItem;
