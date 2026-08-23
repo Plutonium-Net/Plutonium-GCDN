@@ -107,6 +107,7 @@
     { "id": "wordle",                             "name": "Wordle",                                   "path": "games/wordle.html",                                   "image": "images/wordle.png" },
     { "id": "yohoho-io",                          "name": "YoHoHo.io",                                "path": "games/yohoho-io.html",                                "image": "images/yohoho-io.png" },
     { "id": "you-vs-100-skibidi-toilets",         "name": "You vs 100 Skibidi Toilets",               "path": "games/you-vs-100-skibidi-toilets.html",               "image": "images/you-vs-100-skibidi-toilets.png" },
-    { "id": "zombocalypse-2",                     "name": "Zombocalypse 2",                           "path": "games/zombocalypse-2.html",                           "image": "images/zombocalypse-2.png" }
+    { "id": "zombocalypse-2",                     "name": "Zombocalypse 2",                           "path": "games/zombocalypse-2.html",                           "image": "images/zombocalypse-2.png" },
+    { "id": "voltan-launcher",                    "name": "Voltan",                                   "path": "games/voltan-launcher.html",                          "image": "images/voltan.png" }
   ]
 }
