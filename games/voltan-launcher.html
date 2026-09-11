@@ -1,3 +1,4 @@
+<!-- Pluto Game 9/11/2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -142,9 +143,6 @@ function base64ToBytes(base64) {
   return bytes;
 }
 
-// The Apps Script proxy cannot return raw binary with a correct Content-Type,
-// so it wraps files (launcher.html, images, etc.) in a JSON envelope:
-// { ok, type, encoding: "base64", data }. This unwraps it.
 function decodeEnvelopeBlob(text) {
   var payload = JSON.parse(text);
   if (payload.error) throw new Error(payload.error);

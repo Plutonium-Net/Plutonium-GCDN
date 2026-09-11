@@ -1,6 +1,4 @@
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
-<!-- made by genizy -->
+<!-- Pluto Game 9/11/2026 -->
 
 <!DOCTYPE html>
 <html lang="en-us">
@@ -36,14 +34,12 @@
   <link rel="stylesheet" href="webapp/fancade.css">
   <link rel="icon" href="webapp/favicon.ico">
 
-  <!-- POKI SDK -->
   <script src="poki-sdk.js" ></script>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 
 <body id="body">
 
-  <!-- Modal dialog div -->
   <div id="modal_parent">
     <div id="modal_content">
       <span id="modal_close_button">&times;</span>
@@ -52,10 +48,6 @@
     </div>
   </div>
 
-  <!-- 
-      Game canvas and overlay. Emscripten makes some assumptions about how the canvas is positioned in order
-      to translate document to game coordinates
-    -->
   <div id="canvas_border" class="emscripten_border">
     <div id="play_content" class="middle center">
       <div class="edge">
@@ -78,10 +70,8 @@
     <div id="webview_content"></div>
   </div>
 
-  <!-- Manual JS, Called from WASM -->
   <script type="text/javascript" src="webapp/source_min.js"></script>
 
-  <!-- Auto generated JS -->
   <script type="text/javascript" src="webapp/index.js"></script>
 </body>
 

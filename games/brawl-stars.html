@@ -1,3 +1,4 @@
+<!-- Pluto Game 9/11/2026 -->
 <!DOCTYPE html>
 <html lang="en-us">
 <head>
@@ -25,7 +26,7 @@
         bottom: 0px;
         width: 100%;
         height: 90px;
-        display: none !important; /* Reklam alanı tamamen kapalı */
+        display: none !important;
     }
     #loading-overlay {
         font-size: 20px;
@@ -55,7 +56,7 @@
         background: #9747FF;
     }
 </style>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 <body>
 <canvas id="canvas" class="fullscreen"></canvas>
@@ -67,7 +68,6 @@
 
 <script src="https://cdn.jsdelivr.net/gh/Deformed-steve/brawl-stars@main/howler.js"></script>
 <script>
-    // Mobil viewport ayarı
     if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         let meta = document.createElement('meta');
         meta.name = 'viewport';
@@ -129,7 +129,6 @@
         canvas.focus();
     });
 
-    // === YANDEX SDK YERİNE BOŞ MOCK OBJESİ ===
     window.bridge = {
         platform: { id: '', language: 'en', payload: '', tld: '' },
         device: { type: 'desktop' },
@@ -143,19 +142,15 @@
         remoteConfig: { isSupported: false },
         achievements: {},
 
-        // Boş initialize → hemen resolve
         initialize: () => Promise.resolve(),
 
-        // Tüm event'ler boş
         advertisement: { on: () => {} },
         game: { on: () => {} }
     };
 
-    // === TÜM BRIDGE FONKSİYONLARI BOŞ DÖNÜYOR ===
     const mockPromise = (success = true, data = '') => 
         success ? Promise.resolve(data) : Promise.reject();
 
-    // Platform
     window.getPlatformId = () => '';
     window.getPlatformLanguage = () => 'en';
     window.getPlatformPayload = () => '';
@@ -163,10 +158,8 @@
     window.sendMessageToPlatform = () => {};
     window.getServerTime = () => sendMessageToUnity('OnGetServerTimeCompleted', Date.now().toString());
 
-    // Device
     window.getDeviceType = () => 'desktop';
 
-    // Player
     window.getIsPlayerAuthorizationSupported = () => 'false';
     window.getIsPlayerAuthorized = () => 'false';
     window.getPlayerId = () => '';
@@ -174,10 +167,8 @@
     window.getPlayerPhotos = () => '[]';
     window.authorizePlayer = () => sendMessageToUnity('OnAuthorizeCompleted', 'false');
 
-    // Game
     window.getVisibilityState = () => 'visible';
 
-    // Storage
     window.getStorageDefaultType = () => 'local';
     window.getIsStorageSupported = () => 'true';
     window.getIsStorageAvailable = () => 'true';
@@ -185,7 +176,6 @@
     window.setStorageData = (key) => sendMessageToUnity('OnSetStorageDataSuccess', key);
     window.deleteStorageData = (key) => sendMessageToUnity('OnDeleteStorageDataSuccess', key);
 
-    // Advertisement
     window.getInterstitialState = () => '';
     window.getIsBannerSupported = () => 'false';
     window.getMinimumDelayBetweenInterstitial = () => '0';
@@ -196,7 +186,6 @@
     window.showRewarded = () => {};
     window.checkAdBlock = () => sendMessageToUnity('OnCheckAdBlockCompleted', 'false');
 
-    // Social
     window.getIsShareSupported = () => 'false';
     window.getIsInviteFriendsSupported = () => 'false';
     window.getIsJoinCommunitySupported = () => 'false';
@@ -213,7 +202,6 @@
     window.addToFavorites = () => sendMessageToUnity('OnAddToFavoritesCompleted', 'false');
     window.rate = () => sendMessageToUnity('OnRateCompleted', 'false');
 
-    // Leaderboard
     window.getIsLeaderboardSupported = () => 'false';
     window.getIsLeaderboardNativePopupSupported = () => 'false';
     window.getIsLeaderboardSetScoreSupported = () => 'false';
@@ -224,7 +212,6 @@
     window.leaderboardGetEntries = () => sendMessageToUnity('OnLeaderboardGetEntriesCompletedSuccess', '[]');
     window.leaderboardShowNativePopup = () => sendMessageToUnity('OnLeaderboardShowNativePopupCompleted', 'false');
 
-    // Payments
     window.getIsPaymentsSupported = () => 'false';
     window.getIsCatalogSupported = () => 'false';
     window.getIsPurchaseListSupported = () => 'false';
@@ -234,11 +221,9 @@
     window.paymentsGetCatalog = () => sendMessageToUnity('OnPaymentsGetCatalogCompletedSuccess', '[]');
     window.paymentsGetPurchases = () => sendMessageToUnity('OnPaymentsGetPurchasesCompletedSuccess', '[]');
 
-    // Remote Config
     window.getIsRemoteConfigSupported = () => 'false';
     window.remoteConfigGet = () => sendMessageToUnity('OnRemoteConfigGetFailed', '');
 
-    // Achievements
     window.getIsAchievementsSupported = () => 'false';
     window.getIsGetAchievementsListSupported = () => 'false';
     window.getIsAchievementsNativePopupSupported = () => 'false';
@@ -246,7 +231,6 @@
     window.achievementsShowNativePopup = () => sendMessageToUnity('OnAchievementsShowNativePopupCompleted', 'false');
     window.achievementsGetList = () => sendMessageToUnity('OnAchievementsGetListCompletedSuccess', '[]');
 
-    // === UNITY LOADER DOĞRUDAN BAŞLIYOR ===
     const unityLoader = document.createElement('script');
     unityLoader.src = 'https://cdn.jsdelivr.net/gh/ragdoi-archers/zort@main/Build/web.loader.js';
     unityLoader.onload = () => {
@@ -274,7 +258,6 @@
     };
     document.body.appendChild(unityLoader);
 
-    // === SES KONTROLÜ (Howler) ===
     var sounds = {};
     var sound;
     var isSound = 1;

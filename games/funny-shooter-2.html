@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 <html lang="en-us">
@@ -27,7 +26,6 @@
         debug: true
       };
       
-      // Store blob URLs and merged buffers
       window.blobUrls = {};
       window.mergedFiles = {};
       const mergeStatus = {};
@@ -120,7 +118,6 @@
         return null;
       }
 
-      // Intercept fetch to return blob URLs
       if (!window.originalFetch) window.originalFetch = window.fetch;
       window.fetch = function(url, ...args) {
         const name = shouldIntercept(url);
@@ -145,7 +142,6 @@
         return window.originalFetch.call(this, url, ...args);
       }
 
-      // Intercept XHR to use blob URLs
       if (!window.OriginalXMLHttpRequest) window.OriginalXMLHttpRequest = window.XMLHttpRequest;
       window.XMLHttpRequest = function(opts) {
         const xhr = new window.OriginalXMLHttpRequest(opts);
@@ -194,7 +190,6 @@
         return xhr;
       }
 
-      // Start merging process
       async function start() {
         log('Starting merge process...');
         for (const f of config.files) {
@@ -217,7 +212,7 @@
       start();
     })();
     </script>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 <body class="dark">
     <div id="unity-container" class="unity-desktop">

@@ -1,3 +1,4 @@
+<!-- Pluto Game 9/11/2026 -->
 <!DOCTYPE html>
 <html lang="en-us">
 <head>
@@ -108,12 +109,10 @@ Object.defineProperty(HTMLMediaElement.prototype, 'src', {
   enumerable: true,
 });
 
-// fetch
 const originalFetch = window.fetch;
 window.fetch = function(resource, init) {
 
   if (typeof resource === "string") {
-  //console.log(resource)
     resource = rewriteURL(resource);
   } else if (resource instanceof Request) {
     resource = new Request(rewriteURL(resource.url), resource);
@@ -121,7 +120,6 @@ window.fetch = function(resource, init) {
   return originalFetch.call(this, resource, init);
 };
 
-// XMLHttpRequest
 const originalOpen = XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open = function(method, url, ...rest) {
   const newURL = rewriteURL(url);
@@ -142,7 +140,6 @@ window.Audio.prototype = OriginalAudio.prototype;
 
 function rewriteURL(original) {
   var trimmed = original.split("/").pop();
-  //console.log(trimmed)
   if (trimmed.includes("?")) trimmed = trimmed.split("?")[0]
   return blobUrlss[trimmed] || original;
 }</script>
@@ -211,7 +208,7 @@ function rewriteURL(original) {
 		}
 		
 	</script>
-	<script src="https://cdn.cgamz.online/brand.js"></script>
+	
 </head>
 
 <body>
@@ -233,7 +230,6 @@ function rewriteURL(original) {
 				</div>
 			</div>
 		</div>
-		<!--PRODUCT_VERSION:25042201END-->
 		<div class="jss31 jss34" style="flex: 3 1 0%;">
 			<div class="jss32">
 				<div class="jss31 jss34 jss39 jss50 gameloader">
@@ -292,15 +288,11 @@ function rewriteURL(original) {
 	</script>
 	</script>
 	<script>
-		// Analytics placeholder (Firebase removed, using cCloud only)
 		function firebaseSetUserProperties(props) {
-			// Analytics disabled
 		}
 		function firebaseLogEvent(event_name) {
-			// Analytics disabled
 		}
 		function firebaseLogEventParameter(event_name, event_param) {
-			// Analytics disabled
 		}
 	</script>
 	

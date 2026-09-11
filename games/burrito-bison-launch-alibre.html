@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 <html lang="en-us">
@@ -24,7 +23,7 @@
             background-color: #000;
         }
         
-        /* FIXED: Changed ID to match the div below (#gameContainer) */
+        
         #gameContainer {
             width: 100% !important;
             height: 100% !important;
@@ -37,7 +36,7 @@
             align-items: center;
         }
 
-        /* Force canvas inside gameContainer to fit */
+        
         #gameContainer canvas {
             width: 100% !important;
             height: 100% !important;
@@ -47,14 +46,10 @@
     <script>
       window.fileMergerConfig = {
         files: [
-          // Only include files here that are ACTUALLY split into .part1, .part2
           { name: 'burrito-bison-ll.data.unityweb', parts: 2 }, 
           { name: 'burrito-bison-ll.asm.code.unityweb', parts: 2 },
           { name: 'burrito-bison-ll.asm.memory.unityweb', parts: 1 },
           { name: 'burrito-bison-ll.asm.framework.unityweb', parts: 1 },
-          // REMOVED framework and memory. 
-          // Only add them back if you actually split them into .part1 files.
-          // If they are standard files <50MB, let the browser load them normally.
         ],
         basePath: '', 
         debug: true
@@ -219,7 +214,7 @@
           }
       });
     </script>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 <body>
     <div class="webgl-content" style="width: 100%; height: 100%;">

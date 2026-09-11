@@ -1,8 +1,7 @@
 <Module>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 
@@ -68,7 +67,7 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 <body>
   <div id="flash-container"></div>
@@ -88,7 +87,6 @@
       const windowHeight = window.innerHeight;
       const aspectRatio = 5.5 / 3;
       
-      // Use 95% of available space instead of 100%
       let width = Math.floor(windowWidth * 1);
       let height = Math.floor(width / aspectRatio);
       
@@ -100,11 +98,9 @@
       container.style.width = `${width}px`;
       container.style.height = `${height}px`;
       
-      // Calculate margins
       const topMargin = (windowHeight - height) / 2;
       const leftMargin = (windowWidth - width) / 2;
       
-      // Set black box sizes
       boxTop.style.height = `${topMargin}px`;
       boxBottom.style.height = `${topMargin}px`;
       boxLeft.style.width = `${leftMargin}px`;

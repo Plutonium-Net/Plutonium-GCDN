@@ -1,7 +1,6 @@
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 
@@ -26,14 +25,11 @@
   100% {
     transform: translateX(0);
   }
-}</style>  <script src="https://cdn.cgamz.online/brand.js"></script>
+}</style>  
 </head><body dir="ltr">
-<div id="fb-root"></div>
-<script>
-	// Issue a warning if trying to preview an exported project on disk.
-	(function(){
-		// Check for running exported on file protocol
-		if (window.location.protocol.substr(0, 4) ==="file")
+<div id="fb-root"></div>	<script>
+		(function(){
+			if (window.location.protocol.substr(0, 4) ==="file")
 		{
 			alert("Exported games won't work until you upload them. (When running on the file:/// protocol, browsers block many features from working for security reasons.)");
 		}
@@ -52,14 +48,11 @@
 <script src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@27b6c35b8b4c4b1bc73bc09ce01c9a6d7dba0e5d/2min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@27b6c35b8b4c4b1bc73bc09ce01c9a6d7dba0e5d/runtimee.js"></script>
 <script>
-		// Start the Construct 2 project running on window load.
 		jQuery(document).ready(function ()
 		{			
-			// Create new runtime using the c2canvas
 			cr_createRuntime("c2canvas");
 		});
 		
-		// Pause and resume on page becoming visible/invisible
 		function onVisibilityChanged() {
 			if (document.hidden || document.mozHidden || document.webkitHidden || document.msHidden)
 				cr_setSuspended(true);
@@ -77,12 +70,10 @@
 			console.warn("Failed to register service worker: ", e);
 		};
 		
-		// Runtime calls this global method when ready to start caching (i.e. after startup).
-		// This registers the service worker which caches resources for offline support.
 		window.C2_RegisterSW = function C2_RegisterSW()
 		{
 			if (!navigator.serviceWorker)
-				return;		// no SW support, ignore call
+				return;
 			
 			try {
 				navigator.serviceWorker.register("sw.js", { scope: "./" })

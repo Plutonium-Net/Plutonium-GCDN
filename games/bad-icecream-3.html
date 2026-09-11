@@ -1,3 +1,4 @@
+<!-- Pluto Game 9/11/2026 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -36,7 +37,7 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 
 <body>
@@ -81,7 +82,6 @@
       const boxLeft = document.getElementById("box-left");
       const boxRight = document.getElementById("box-right");
 
-      // Safety check: if any are missing, fail loudly instead of a white screen
       if (!container || !boxTop || !boxBottom || !boxLeft || !boxRight) {
         document.body.textContent = "Missing required page elements (#flash-container / black boxes).";
         return;

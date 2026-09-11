@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 <html lang="en">
@@ -17,7 +16,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta charset="utf-8" />
 
-    <!-- Set the title bar of the page -->
     <title>Bacon May Die by SnoutUp </title>
     <meta name="robots" content="noindex,nofollow" />
     <script src="poki-sdk.js"></script>
@@ -45,7 +43,6 @@
 
             background-color: #191923;
 
-            //background-image: url('html5game/wolf.gif');
             background-image: url('html5game/bg.jpg');
             background-repeat: repeat-x;
             background-position: center center;
@@ -150,12 +147,11 @@
 
         .
     </style>
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 
 <body id="body">
     <div class="gm4html5_div_class" id="gm4html5_div_id">
-        <!-- Create the canvas element the game draws to -->
         <canvas id="canvas" width="1024" height="576">
             <p>Your browser doesn't support HTML5 canvas.</p>
         </canvas>
@@ -248,9 +244,6 @@
             });           
 
 
-			//document.getElementById("door").style.top= (300 * bgScale) + "px";
-			//document.getElementById("door").style.width = (bgScale * 100) +"%";
-			//document.getElementById("door").style.height = (bgScale * 100) +"%";
 		}
 		
 		window.addEventListener('wheel', ev => ev.preventDefault(), { passive: false });
@@ -261,7 +254,6 @@
 		});		
             
                 
-        /// smooth things out 
         function loading_lerp (start, end, amt){
             return (1 - amt) * start + amt * end;
         }

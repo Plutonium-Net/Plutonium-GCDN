@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 
@@ -18,7 +17,7 @@
     <title>Basketball Stars</title>
 
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 
 <body>
@@ -48,7 +47,6 @@
             onEvent: function (event) {
                 switch (event.name) {
                     case "SDK_GAME_START":
-                        // advertisement done, resume game logic and unmute audio
                         var event;
                         if (notIE11) {
                             event = new Event("SDK_GAME_START");
@@ -59,7 +57,6 @@
                         document.getElementById("content").dispatchEvent(event);
                         break;
                     case "SDK_GAME_PAUSE":
-                        // pause game logic / mute audio
                         var event;
                         if (notIE11) {
                             event = new Event("SDK_GAME_PAUSE");
@@ -70,7 +67,6 @@
                         document.getElementById("content").dispatchEvent(event);
                         break;
                     case "SDK_READY":
-                        // this event is triggered when your user doesn't want personalised targeting of ads and such
                         console.log("SDK_READY");
                         break;
                 }

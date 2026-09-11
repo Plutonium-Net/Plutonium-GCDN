@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 
 
-<!-- Ultimate Game Stash file--> 
-<!-- For the regularly updating doc go to https://docs.google.com/document/d/1_FmH3BlSBQI7FGgAQL59-ZPe8eCxs35wel6JUyVaG8Q/ -->
+<!-- Pluto Game 9/11/2026 -->
 
 
 
@@ -11,7 +10,6 @@
 <script src="../js/sync.js"></script>
     <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/slope%203/">
      <head>
-<script src="../js/sync.js"></script>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -41,7 +39,7 @@
             flex-grow: 1;
         }
         .footer {
-            /* Keep footer hidden or minimal */
+            
             height: 5%;
             width: 100%;
             display: none; 
@@ -51,11 +49,8 @@
     <script>
       window.fileMergerConfig = {
         files: [
-          // Assuming the data file referenced in build.json is called 'build.data' or similar.
-          // You must confirm the exact name of the data file that was split.
           { name: 'Slope3.data.unityweb', parts: 2 } 
         ],
-        // All these files are likely in the root, where build.json is.
         basePath: '', 
         debug: true
       };
@@ -73,8 +68,6 @@
       function normalizeUrl(url) { try { return decodeURIComponent(url.toString().split('?')[0]); } catch (e) { return url; } }
       function urlsMatch(url1, url2) {
         const n1 = normalizeUrl(url1), n2 = normalizeUrl(url2);
-        // Special case for Unity 2018 and older: they append a hash to the data file.
-        // We only check for the base name.
         const name1 = n1.split('/').pop().split('?')[0];
         const name2 = n2.split('/').pop().split('?')[0];
 
@@ -115,7 +108,6 @@
 
       function getMerged(name) {
         if (window.mergedFiles[name]) return window.mergedFiles[name];
-        // Check by partial key, useful for versioned names like `build.data.12345`
         for (const [k, v] of Object.entries(window.mergedFiles)) {
              if (k.startsWith(name)) return v;
         }
@@ -171,9 +163,7 @@
            const path = config.basePath + f.name;
            mergeStatus[f.name] = 'merging';
            mergeSplitFiles(path, f.parts).then(b => {
-             // Store the buffer using the name of the file being requested by Unity
              window.mergedFiles[f.name] = b; 
-             // Also store it using the full path, just in case
              window.mergedFiles[path] = b;
              mergeStatus[f.name] = 'ready';
            }).catch(() => mergeStatus[f.name] = 'failed');
@@ -197,7 +187,7 @@
             }
         });
     </script>
-      <script src="https://cdn.cgamz.online/brand.js"></script>
+      
 </head>
 
 <body>

@@ -1,3 +1,4 @@
+<!-- Pluto Game 9/11/2026 -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -10,7 +11,7 @@
     <link rel="stylesheet" href="style.css">
     <link id="-gd-engine-icon" rel="icon" type="image/png" href="buckshot-roulette.icon.png" />
     <link rel="apple-touch-icon" href="buckshot-roulette.apple-touch-icon.png" />
-  <script src="https://cdn.cgamz.online/brand.js"></script>
+  
 </head>
 
 <body>
@@ -99,7 +100,6 @@
                     } catch (err) {
                         serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
                     }
-                    // There's a chance that installing the service worker would fix the issue
                     Promise.race([
                         serviceWorkerRegistrationPromise.then((registration) => {
                             if (registration != null) {
@@ -107,18 +107,15 @@
                             }
                             return registration;
                         }).then(() => engine.installServiceWorker()),
-                        // For some reason, `getRegistration()` can stall
                         new Promise((resolve) => {
                             setTimeout(() => resolve(), 2000);
                         }),
                     ]).then(() => {
-                        // Reload if there was no error.
                         window.location.reload();
                     }).catch((err) => {
                         console.error('Error while registering service worker:', err);
                     });
                 } else {
-                    // Display the message as usual
                     const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
                     displayFailureNotice(missingMsg + missing.join('\n'));
                 }
