@@ -72,18 +72,6 @@
       "image": "images/bad-icecream.png"
     },
     {
-      "id": "bad-icecream-2",
-      "name": "Bad Ice-Cream 2",
-      "path": "games/bad-icecream-2/index.html",
-      "image": "images/bad-icecream-2.png"
-    },
-    {
-      "id": "bad-icecream-3",
-      "name": "Bad Ice-Cream 3",
-      "path": "games/bad-icecream-3/index.html",
-      "image": "images/bad-icecream-3.png"
-    },
-    {
       "id": "bad-parenting",
       "name": "Bad Parenting",
       "path": "games/bad-parenting/index.html",

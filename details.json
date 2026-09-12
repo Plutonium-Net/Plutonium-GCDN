@@ -76,20 +76,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "bad-icecream-2": {
-    "description": "The second Bad Ice-Cream adds more stages, hazards, and fruit-chasing maze puzzles. Break ice, build barriers, and stay just ahead of enemies with a friend or solo.",
-    "controls": [],
-    "banner": "images/bad-icecream-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "bad-icecream-3": {
-    "description": "Bad Ice-Cream 3 continues the maze action with new layouts and trickier enemy patterns. Use ice walls creatively, grab every fruit, and keep the round under control.",
-    "controls": [],
-    "banner": "images/bad-icecream-3.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "bad-parenting": {
     "description": "A browser port of the mobile horror game about an unsettling home and a disturbing family story. Explore carefully, follow the strange events, and let the tension build as the truth comes out.",
     "controls": [],
