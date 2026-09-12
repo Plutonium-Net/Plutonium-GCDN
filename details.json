@@ -1,0 +1,746 @@
+{
+  "1": {
+    "description": "1 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/1.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "10-minutes-till-dawn": {
+    "description": "10 Minutes Till Dawn is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/10-minutes-till-dawn.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "2048-cupcakes": {
+    "description": "2048 Cupcakes is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/2048-cupcakes.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "9007199254740992": {
+    "description": "9007199254740992 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/9007199254740992.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "99-balls": {
+    "description": "99 Balls is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/99-balls.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "a-small-world-cup": {
+    "description": "A Small World Cup is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/a-small-world-cup.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "achievement-unlocked": {
+    "description": "Achievement Unlocked is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/achievement-unlocked.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "animal-crossing-wild-world": {
+    "description": "Animal Crossing: Wild World is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/animal-crossing-wild-world.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "aqua-park-io": {
+    "description": "Aqua Park.io is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/aqua-park-io.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "backrooms-2d": {
+    "description": "Backrooms 2D is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/backrooms-2d.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "backrooms-3d": {
+    "description": "Backrooms 3D is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/backrooms-3d.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bacon-may-die": {
+    "description": "Bacon May Die is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bacon-may-die.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bad-icecream": {
+    "description": "Bad Ice-Cream is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bad-icecream.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bad-icecream-2": {
+    "description": "Bad Ice-Cream 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bad-icecream-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bad-icecream-3": {
+    "description": "Bad Ice-Cream 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bad-icecream-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bad-parenting": {
+    "description": "Bad Parenting is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bad-parenting.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bad-piggies": {
+    "description": "Bad Piggies is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bad-piggies.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "baldis-basics": {
+    "description": "Baldi's Basics is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/baldis-basics.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "ball-maze": {
+    "description": "Ball Maze is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/ball-maze.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "basket-random": {
+    "description": "Ragdoll basketball for one or two players. First to five buckets takes the match.\nRematches re-roll the teams, so no two games play the same.",
+    "controls": [
+      {
+        "keys": "W A S D",
+        "action": "Move"
+      },
+      {
+        "keys": "Space",
+        "action": "Jump & shoot"
+      },
+      {
+        "keys": "R",
+        "action": "Reset the ball"
+      }
+    ],
+    "banner": "images/basket-random.png",
+    "cloudSync": true,
+    "tags": [
+      "2 Player",
+      "Sports"
+    ]
+  },
+  "basketball-legends": {
+    "description": "Basketball Legends is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/basketball-legends.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "basketball-stars": {
+    "description": "Basketball Stars is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/basketball-stars.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "battle-karts": {
+    "description": "Battle Karts is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/battle-karts.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "big-flappy-tower-tiny-square": {
+    "description": "Big Flappy Tower Tiny Square is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/big-flappy-tower-tiny-square.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "big-ice-tower-tiny-square": {
+    "description": "Big Ice Tower Tiny Square is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/big-ice-tower-tiny-square.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "big-neon-tower-tiny-square": {
+    "description": "Big Neon Tower Tiny Square is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/big-neon-tower-tiny-square.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "big-tower-tiny-square-2": {
+    "description": "Big Tower Tiny Square 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/big-tower-tiny-square-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "block-blast": {
+    "description": "Block Blast is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/block-blast.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "block-blast-2": {
+    "description": "Block Blast 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/block-blast-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "blood-money": {
+    "description": "Blood Money is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/blood-money.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "bloxorz": {
+    "description": "Bloxorz is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/bloxorz.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "brawl-stars": {
+    "description": "Brawl Stars is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/brawl-stars.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "buckshot-roulette": {
+    "description": "Buckshot Roulette is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/buckshot-roulette.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "burrito-bison-launch-alibre": {
+    "description": "Burrito Bison: Launch Alibre is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/burrito-bison-launch-alibre.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "celeste": {
+    "description": "Celeste is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/celeste.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "celeste-2": {
+    "description": "Celeste 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/celeste-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "cluster-rush": {
+    "description": "Cluster Rush is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/cluster-rush.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "cookie-clicker": {
+    "description": "Cookie Clicker is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/cookie-clicker.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "core-ball": {
+    "description": "Core Ball is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/core-ball.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "crazy-cars": {
+    "description": "Crazy Cars is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/crazy-cars.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "crazy-cattle-3d": {
+    "description": "Crazy Cattle 3D is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/crazy-cattle-3d.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "crossy-road": {
+    "description": "Crossy Road is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/crossy-road.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "deltarune": {
+    "description": "Deltarune is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/deltarune.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "drift-boss": {
+    "description": "Drift Boss is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/drift-boss.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "drive-mad": {
+    "description": "Drive Mad is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/drive-mad.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "duck-life": {
+    "description": "Duck Life is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/duck-life.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "duck-life-2": {
+    "description": "Duck Life 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/duck-life-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "duck-life-3": {
+    "description": "Duck Life 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/duck-life-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "eggy-car": {
+    "description": "Eggy Car is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/eggy-car.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "fire-boy-and-water-girl": {
+    "description": "Fireboy and Watergirl is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/fire-boy-and-water-girl.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "flappy-bird": {
+    "description": "Flappy Bird is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/flappy-bird.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "fnaf": {
+    "description": "Five Nights at Freddy's is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/fnaf.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "fnaf-2": {
+    "description": "Five Nights at Freddy's 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/fnaf-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "fnaf-3": {
+    "description": "Five Nights at Freddy's 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/fnaf-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "fnaw": {
+    "description": "Five Nights at Wario's is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/fnaw.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "free-rider": {
+    "description": "Free Rider is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/free-rider.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "funny-shooter-2": {
+    "description": "Funny Shooter 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/funny-shooter-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "geometry-dash-3d": {
+    "description": "Geometry Dash 3D is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/geometry-dash-3d.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "granny": {
+    "description": "Granny is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/granny.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "grow-a-garden": {
+    "description": "Grow a Garden is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/grow-a-garden.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "gta-2": {
+    "description": "GTA 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/gta-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "happy-wheels": {
+    "description": "Happy Wheels is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/happy-wheels.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "hextris": {
+    "description": "Hextris is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/hextris.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "learn-to-fly": {
+    "description": "Learn to Fly is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/learn-to-fly.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "learn-to-fly-2": {
+    "description": "Learn to Fly 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/learn-to-fly-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "learn-to-fly-3": {
+    "description": "Learn to Fly 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/learn-to-fly-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "minecraft-1.5.2": {
+    "description": "Minecraft 1.5.2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/minecraft-1.5.2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "minecraft-indev": {
+    "description": "Minecraft Indev is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/minecraft-indev.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "minecraft-parkour": {
+    "description": "Minecraft Parkour is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/minecraft-parkour.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "minecraft-tower-defence": {
+    "description": "Minecraft Tower Defence is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/minecraft-tower-defence.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "minecraft-zeta-client": {
+    "description": "Minecraft Zeta Client is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/minecraft-zeta-client.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "motox3m": {
+    "description": "Moto X3M is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/motox3m.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "motox3m-2": {
+    "description": "Moto X3M 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/motox3m-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "motox3m-3": {
+    "description": "Moto X3M 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/motox3m-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "motox3m-spookyland": {
+    "description": "Moto X3M Spookyland is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/motox3m-spookyland.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "motox3m-winter": {
+    "description": "Moto X3M Winter is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/motox3m-winter.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "plants-vs-zombies": {
+    "description": "Plants vs. Zombies is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/plants-vs-zombies.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "retro-bowl": {
+    "description": "Retro Bowl is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/retro-bowl.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "short-life": {
+    "description": "Short Life is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/short-life.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "slither-io": {
+    "description": "Slither.io is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/slither-io.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "slope-3": {
+    "description": "Slope 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/slope-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "slow-roads": {
+    "description": "Slow Roads is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/slow-roads.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "snow-rider-3d": {
+    "description": "Snow Rider 3D is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/snow-rider-3d.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "soccer-random": {
+    "description": "Soccer Random is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/soccer-random.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "subway-surfers": {
+    "description": "Subway Surfers is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/subway-surfers.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "super-hot": {
+    "description": "Superhot is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/super-hot.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "the-binding-of-isaac": {
+    "description": "The Binding of Isaac is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/the-binding-of-isaac.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "the-legend-of-zelda-the-minish-cap": {
+    "description": "The Legend of Zelda: The Minish Cap is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/the-legend-of-zelda-the-minish-cap.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "the-worlds-hardest-game": {
+    "description": "The World's Hardest Game is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/the-worlds-hardest-game.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "tiny-fishing": {
+    "description": "Tiny Fishing is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/tiny-fishing.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "ultrakill": {
+    "description": "Ultrakill is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/ultrakill.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex": {
+    "description": "Vex is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex-2": {
+    "description": "Vex 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex-3": {
+    "description": "Vex 3 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex-3.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex-6": {
+    "description": "Vex 6 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex-6.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex-7": {
+    "description": "Vex 7 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex-7.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "vex-8": {
+    "description": "Vex 8 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/vex-8.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "volly-random": {
+    "description": "Volly Random is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/volly-random.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "word-wonders": {
+    "description": "Word Wonders is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/word-wonders.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "wordle": {
+    "description": "Wordle is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/wordle.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "yohoho-io": {
+    "description": "YoHoHo.io is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/yohoho-io.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "you-vs-100-skibidi-toilets": {
+    "description": "You vs 100 Skibidi Toilets is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/you-vs-100-skibidi-toilets.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "zombocalypse-2": {
+    "description": "Zombocalypse 2 is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/zombocalypse-2.png",
+    "cloudSync": true,
+    "tags": []
+  },
+  "voltan-launcher": {
+    "description": "Voltan is available to play instantly in the browser.",
+    "controls": [],
+    "banner": "images/voltan.png",
+    "cloudSync": true,
+    "tags": []
+  }
+}

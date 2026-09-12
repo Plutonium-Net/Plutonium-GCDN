@@ -167,7 +167,8 @@
       <div class="section">
         <div class="section__heading">Structure</div>
         <pre>/
-├── config.json       # Game registry (names, paths, metadata)
+├── config.json       # Game registry (names, paths)
+├── details.json      # Descriptions, controls, banners, sync, tags
 └── games/            # One .html file per game
     ├── cookie-clicker.html
     ├── minecraft-1.5.2.html
@@ -185,6 +186,7 @@
             <tr><td><code>name</code></td><td>Human-readable display name</td></tr>
             <tr><td><code>path</code></td><td>Relative path to the game's HTML file</td></tr>
             <tr><td><code>image</code></td><td>Relative path to the game's thumbnail</td></tr>
+            <tr><td><code>details.json</code></td><td>Per-game metadata keyed by game id</td></tr>
           </tbody>
         </table>
       </div>
@@ -194,6 +196,7 @@
         <ol>
           <li>Drop the self-contained <code>.html</code> file into <code>games/</code>.</li>
           <li>Add a corresponding entry to the <code>games</code> array in <code>config.json</code>.</li>
+          <li>Add matching metadata to <code>details.json</code>.</li>
         </ol>
       </div>
 
