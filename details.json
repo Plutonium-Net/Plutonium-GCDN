@@ -48,13 +48,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "aqua-park-io": {
-    "description": "Race down a giant water slide against other riders while looking for risky shortcuts. Cut corners, bump rivals, and try to splash into first place before the run ends.",
-    "controls": [],
-    "banner": "images/aqua-park-io.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "backrooms-2d": {
     "description": "Explore a flat, unsettling maze inspired by the Backrooms while searching for a way out. The danger comes from getting lost, watching your route, and staying calm as the space keeps stretching on.",
     "controls": [],

@@ -48,12 +48,6 @@
       "image": "images/achievement-unlocked.png"
     },
     {
-      "id": "aqua-park-io",
-      "name": "Aqua Park.io",
-      "path": "games/aqua-park-io/index.html",
-      "image": "images/aqua-park-io.png"
-    },
-    {
       "id": "backrooms-2d",
       "name": "Backrooms 2D",
       "path": "games/backrooms-2d/index.html",
