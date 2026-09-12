@@ -169,9 +169,9 @@
         <pre>/
 ├── config.json       # Game registry (names, paths)
 ├── details.json      # Descriptions, controls, banners, sync, tags
-└── games/            # One .html file per game
-    ├── cookie-clicker.html
-    ├── minecraft-1.5.2.html
+└── games/            # One folder per game
+    ├── cookie-clicker/index.html
+    ├── minecraft-1.5.2/index.html
     └── ...</pre>
       </div>
 
@@ -194,7 +194,7 @@
       <div class="section">
         <div class="section__heading">Adding a Game</div>
         <ol>
-          <li>Drop the self-contained <code>.html</code> file into <code>games/</code>.</li>
+          <li>Add the self-contained game page as <code>games/&lt;game-id&gt;/index.html</code>.</li>
           <li>Add a corresponding entry to the <code>games</code> array in <code>config.json</code>.</li>
           <li>Add matching metadata to <code>details.json</code>.</li>
         </ol>

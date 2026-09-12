@@ -8,9 +8,9 @@ A collection of browser-playable games, served as standalone HTML files via a CD
 /
 ├── config.json       # Game registry (names, paths)
 ├── details.json      # Per-game descriptions, controls, banners, sync, tags
-└── games/            # One .html file per game
-    ├── cookie-clicker.html
-    ├── minecraft-1.5.2.html
+└── games/            # One folder per game
+    ├── cookie-clicker/index.html
+    ├── minecraft-1.5.2/index.html
     └── ...
 ```
 
@@ -32,7 +32,7 @@ The root [`config.json`](config.json) is the source of truth for the game catalo
     "gamesDir": "games"
   },
   "games": [
-    { "id": "cookie-clicker", "name": "Cookie Clicker", "path": "games/cookie-clicker.html" }
+    { "id": "cookie-clicker", "name": "Cookie Clicker", "path": "games/cookie-clicker/index.html" }
   ]
 }
 ```
@@ -55,7 +55,7 @@ The root [`details.json`](details.json) stores optional per-game metadata keyed 
 
 ## Adding a Game
 
-1. Drop the self-contained `.html` file into `games/`.
+1. Add the self-contained game page as `games/<game-id>/index.html`.
 2. Add a corresponding entry to the `games` array in `config.json`.
 3. Add a matching metadata entry to `details.json`.
 
