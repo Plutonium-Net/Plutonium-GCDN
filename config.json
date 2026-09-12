@@ -48,12 +48,6 @@
       "image": "images/achievement-unlocked.png"
     },
     {
-      "id": "animal-crossing-wild-world",
-      "name": "Animal Crossing: Wild World",
-      "path": "games/animal-crossing-wild-world/index.html",
-      "image": "images/animal-crossing-wild-world.png"
-    },
-    {
       "id": "aqua-park-io",
       "name": "Aqua Park.io",
       "path": "games/aqua-park-io/index.html",

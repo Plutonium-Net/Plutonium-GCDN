@@ -48,13 +48,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "animal-crossing-wild-world": {
-    "description": "Visit a cozy village, meet animal neighbors, decorate your home, and settle into a gentle daily routine. This Nintendo DS classic is built around collecting, fishing, chatting, and letting the town change over time.",
-    "controls": [],
-    "banner": "images/animal-crossing-wild-world.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "aqua-park-io": {
     "description": "Race down a giant water slide against other riders while looking for risky shortcuts. Cut corners, bump rivals, and try to splash into first place before the run ends.",
     "controls": [],
