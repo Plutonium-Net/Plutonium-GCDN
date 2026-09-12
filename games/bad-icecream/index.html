@@ -1,11 +1,4 @@
-<Module>
-
-
 <!-- Pluto Game 9/11/2026 -->
-
-
-
-<Module>
 <html lang="en">
 <head>
 <script src="../../js/sync.js"></script>
@@ -66,7 +59,7 @@
       display: block;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
+  <script src="ruffle.min.js"></script>
   
 </head>
 <body>
@@ -117,15 +110,13 @@
         player.style.height = "100%";
         player.style.background = "black";
         container.appendChild(player);
-        player.load("$1");
+        player.load("Bad-Ice-Cream.swf");
       } else {
         container.textContent = "Ruffle failed to load."; 
       }
     });
   </script>
-    <param name="movie" value="https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@8fecedfd237e90740ce30b860005e6819b6df9cd/Bad-Ice-Cream.swf">
-    <embed src="https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@8fecedfd237e90740ce30b860005e6819b6df9cd/Bad-Ice-Cream.swf" width="100%" height="100%">
+    <param name="movie" value="Bad-Ice-Cream.swf">
+    <embed src="Bad-Ice-Cream.swf" width="100%" height="100%">
 </body>
 </html>
-]]></Content>
-</Module>
