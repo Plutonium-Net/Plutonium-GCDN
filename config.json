@@ -96,12 +96,6 @@
       "image": "images/ball-maze.png"
     },
     {
-      "id": "basket-random",
-      "name": "Basket Random",
-      "path": "games/basket-random/index.html",
-      "image": "images/basket-random.png"
-    },
-    {
       "id": "basketball-legends",
       "name": "Basketball Legends",
       "path": "games/basketball-legends/index.html",

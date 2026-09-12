@@ -104,29 +104,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "basket-random": {
-    "description": "Ragdoll basketball for one or two players. First to five buckets takes the match.\nRematches re-roll the teams, so no two games play the same.",
-    "controls": [
-      {
-        "keys": "W A S D",
-        "action": "Move"
-      },
-      {
-        "keys": "Space",
-        "action": "Jump & shoot"
-      },
-      {
-        "keys": "R",
-        "action": "Reset the ball"
-      }
-    ],
-    "banner": "images/basket-random.png",
-    "cloudSync": false,
-    "tags": [
-      "2 Player",
-      "Sports"
-    ]
-  },
   "basketball-legends": {
     "description": "Pick a famous-style basketball star and battle through fast arcade matches. Dunk, steal, block, and use special moves to take over the court alone or with a friend.",
     "controls": [],
