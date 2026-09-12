@@ -1,24 +1,17 @@
 <!DOCTYPE html>
-
-
 <!-- Pluto Game 9/11/2026 -->
-
-
 <html lang="en">
  
 <head>
 <script src="../../js/sync.js"></script>
     <meta http-equiv="X-UA-Compatible" content="IE=edge" /> 
-    <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@23edae6437a2cded4027d5c487fc9f6362e3ebfd/bacon%20may%20die/"
+
     <meta http-equiv="pragma" content="no-cache" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta charset="utf-8" />
-
-    <title>Bacon May Die by SnoutUp </title>
     <meta name="robots" content="noindex,nofollow" />
-    <script src="poki-sdk.js"></script>
     <script></script>
 
     <script>
@@ -143,9 +136,6 @@
             padding: 0px;
             border: 0px;
         }
-
-
-        .
     </style>
   
 </head>
@@ -169,7 +159,6 @@
     </div>
 
     <script>
-        var sdk 		= PokiSDK;
 		var pokiDebug 	= false;
         var canvas      = document.getElementById("canvas");
 		var body 		= document.getElementById("body");
@@ -192,7 +181,6 @@
 		
 		function poki_loading(progress) {
 			fakeCentTarget = Math.max(fakeCentTarget, progress * 100);
-			sdk.gameLoadingProgress({percentageDone: progress * 0.9});
 			
 			if (progress == 1) {
 				setTimeout(function () {
@@ -229,13 +217,7 @@
 		body.style.backgroundSize = (512 * bgScale) + "px " + (1024 * bgScale) + "px";
 		
 		window.onload = function() {
-			sdk.init().then(() => {
-                setTimeout(gamemaker_start, adsAreDisabled ? 5000 : 1);
-                sdk.setDebug(pokiDebug);   
-				sdk.gameLoadingStart();		
-			}).catch(() => {
-                gamemaker_start();
-			});
+			gamemaker_start();
         
             canvas.width  = window.innerWidth;
             canvas.height = window.innerHeight;
