@@ -1,58 +1,9 @@
 {
-  "1": {
-    "description": "A reverse 2048 puzzle where the board starts with 2048 tiles instead of tiny numbers. Merge downward, plan your space carefully, and try to work all the way back to 1.",
-    "controls": [],
-    "banner": "images/1.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "10-minutes-till-dawn": {
     "description": "Survive waves of monsters in a dark arena where every upgrade changes the rhythm of the run. Build a loadout fast, keep moving, and try to last until the timer runs out.",
     "controls": [],
     "banner": "images/10-minutes-till-dawn.png",
     "cloudSync": true,
-    "tags": []
-  },
-  "2048-cupcakes": {
-    "description": "Slide matching cupcakes together to create higher-value treats on a tight grid. It is the familiar 2048 puzzle loop with a sweeter theme and plenty of one-more-try pull.",
-    "controls": [],
-    "banner": "images/2048-cupcakes.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "9007199254740992": {
-    "description": "A super-sized 2048 variant that keeps climbing far beyond the usual end tile. Merge matching numbers, manage the board, and see if you can reach 9007199254740992.",
-    "controls": [],
-    "banner": "images/9007199254740992.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "99-balls": {
-    "description": "Aim carefully, fire a chain of balls, and break numbered targets before they crawl too far down the board. Smart angles and rebounds are the difference between a short run and a huge score.",
-    "controls": [],
-    "banner": "images/99-balls.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "a-small-world-cup": {
-    "description": "A quick soccer challenge where timing and momentum matter more than complicated controls. Knock the ball past your opponent, win rounds, and keep the tiny tournament alive.",
-    "controls": [],
-    "banner": "images/a-small-world-cup.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "achievement-unlocked": {
-    "description": "Explore a small experimental platforming space where almost everything you do triggers an achievement. The joke is part of the game: progress comes from testing weird ideas and finding every little task.",
-    "controls": [],
-    "banner": "images/achievement-unlocked.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "backrooms-2d": {
-    "description": "Explore a flat, unsettling maze inspired by the Backrooms while searching for a way out. The danger comes from getting lost, watching your route, and staying calm as the space keeps stretching on.",
-    "controls": [],
-    "banner": "images/backrooms-2d.png",
-    "cloudSync": false,
     "tags": []
   },
   "backrooms-3d": {
@@ -66,62 +17,6 @@
     "description": "Fight through waves of enemies as a scrappy hero with melee weapons, guns, and fast dodges. The action is silly, punchy, and built for chaotic survival runs.",
     "controls": [],
     "banner": "images/bacon-may-die.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "bad-icecream": {
-    "description": "Guide your frozen character through maze-like stages, collect fruit, and use ice blocks to trap or dodge enemies. It is especially fun in two-player mode, where teamwork can save a messy round.",
-    "controls": [],
-    "banner": "images/bad-icecream.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "bad-parenting": {
-    "description": "A browser port of the mobile horror game about an unsettling home and a disturbing family story. Explore carefully, follow the strange events, and let the tension build as the truth comes out.",
-    "controls": [],
-    "banner": "images/bad-parenting.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "bad-piggies": {
-    "description": "Build strange vehicles from parts and help the pigs reach the finish or collect objectives. Success comes from tinkering, testing, and laughing at the contraptions that almost work.",
-    "controls": [],
-    "banner": "images/bad-piggies.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "baldis-basics": {
-    "description": "Collect notebooks inside a strange school while avoiding Baldi and the other odd characters roaming the halls. It looks simple at first, but the pressure ramps up quickly as each mistake makes escape harder.",
-    "controls": [],
-    "banner": "images/baldis-basics.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "ball-maze": {
-    "description": "Play the Amaze-style ball maze game popular from YouTube clips. Swipe or steer the ball through each maze, fill the paths, and solve the route without leaving gaps.",
-    "controls": [],
-    "banner": "images/ball-maze.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "basketball-legends": {
-    "description": "Pick a famous-style basketball star and battle through fast arcade matches. Dunk, steal, block, and use special moves to take over the court alone or with a friend.",
-    "controls": [],
-    "banner": "images/basketball-legends.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "basketball-stars": {
-    "description": "Play flashy one-on-one or two-on-two basketball with quick steals, deep shots, and powerful dunks. The match flow is fast, simple, and built around timing your moves better than your opponent.",
-    "controls": [],
-    "banner": "images/basketball-stars.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "battle-karts": {
-    "description": "Drive into arena combat where racing lines and weapon timing both matter. Grab powerups, chase rivals, and try to survive the chaos long enough to finish on top.",
-    "controls": [],
-    "banner": "images/battle-karts.png",
     "cloudSync": false,
     "tags": []
   },
@@ -153,66 +48,10 @@
     "cloudSync": false,
     "tags": []
   },
-  "block-blast": {
-    "description": "Fit block shapes onto the board and clear lines to keep space open. The puzzle is calm at first, but every placement matters once the board starts filling up.",
-    "controls": [],
-    "banner": "images/block-blast.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "block-blast-2": {
-    "description": "A second Block Blast entry with the same satisfying shape-fitting puzzle flow. Place blocks, clear lines, and keep enough open space to survive the next pieces.",
-    "controls": [],
-    "banner": "images/block-blast-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "blood-money": {
-    "description": "An indie horror clicker where earning money comes with increasingly uncomfortable choices. Simple clicking slowly turns into a darker test of how far you are willing to go.",
-    "controls": [],
-    "banner": "images/blood-money.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "bloxorz": {
-    "description": "Roll a rectangular block across floating platforms and drop it perfectly into the goal hole. Every move changes your shape and footprint, so the puzzle is all about planning ahead.",
-    "controls": [],
-    "banner": "images/bloxorz.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "brawl-stars": {
-    "description": "Jump into quick top-down arena battles inspired by team brawling and character abilities. Choose your fighter, control the map, and outplay opponents in short action-heavy matches.",
-    "controls": [],
-    "banner": "images/brawl-stars.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "buckshot-roulette": {
     "description": "Face a tense tabletop duel built around a shotgun, limited items, and reading the odds. Each round is a risky mind game where one wrong call can end everything.",
     "controls": [],
     "banner": "images/buckshot-roulette.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "burrito-bison-launch-alibre": {
-    "description": "Launch Burrito Bison across candy-filled arenas and smash through enemies for speed and cash. Upgrade your power, bounce farther, and try to break through each wall in style.",
-    "controls": [],
-    "banner": "images/burrito-bison-launch-alibre.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "celeste": {
-    "description": "Climb a dangerous mountain in a precision platformer about dashing, stamina, and clean movement. The challenge is tough but readable, with each screen asking you to master one sharp idea.",
-    "controls": [],
-    "banner": "images/celeste.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "celeste-2": {
-    "description": "A small follow-up prototype to Celeste with tight platforming and a grapple-style movement twist. It is short, focused, and built around learning a new rhythm of motion.",
-    "controls": [],
-    "banner": "images/celeste-2.png",
     "cloudSync": false,
     "tags": []
   },
@@ -237,13 +76,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "crazy-cars": {
-    "description": "Drive through open stunt tracks with ramps, loops, and plenty of room to cause harmless mayhem. It is more about playful vehicle control than strict racing lines.",
-    "controls": [],
-    "banner": "images/crazy-cars.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "crazy-cattle-3d": {
     "description": "Drive a cattle around a chaotic 3D arena and slam into others until only one is left standing. Use speed, angles, and physics to knock rivals out before they do the same to you.",
     "controls": [],
@@ -255,20 +87,6 @@
     "description": "Hop across roads, rivers, and train tracks while chasing one more step forward. The rules are instant to understand, but the timing gets dangerous fast.",
     "controls": [],
     "banner": "images/crossy-road.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "deltarune": {
-    "description": "Enter Toby Fox's story-driven RPG world with turn-based battles, strange humor, and memorable characters. Choices, dodges, and dialogue all shape the rhythm of the adventure.",
-    "controls": [],
-    "banner": "images/deltarune.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "drift-boss": {
-    "description": "Steer through a floating track where every corner demands the right drift timing. Stay on the road, collect rewards, and see how long you can keep the run alive.",
-    "controls": [],
-    "banner": "images/drift-boss.png",
     "cloudSync": false,
     "tags": []
   },
@@ -300,62 +118,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "eggy-car": {
-    "description": "Drive a bumpy car while balancing a fragile egg in the back. Gentle throttle control and careful landings matter more than raw speed.",
-    "controls": [],
-    "banner": "images/eggy-car.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "fire-boy-and-water-girl": {
-    "description": "Control two elemental characters through cooperative temple puzzles. Fireboy and Watergirl must avoid opposite hazards, press switches, and help each other reach the exits.",
-    "controls": [],
-    "banner": "images/fire-boy-and-water-girl.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "flappy-bird": {
-    "description": "Tap to keep the bird airborne and thread it through narrow pipe gaps. It is brutally simple, instantly readable, and entirely about rhythm.",
-    "controls": [],
-    "banner": "images/flappy-bird.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "fnaf": {
-    "description": "Survive nights as a security guard while animatronics move through the building. Watch cameras, manage doors and power, and stay alive until morning.",
-    "controls": [],
-    "banner": "images/fnaf.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "fnaf-2": {
-    "description": "Return to the night shift with more animatronics, faster pressure, and a mask mechanic. You have to juggle cameras, vents, lights, and audio cues before the office gets overwhelmed.",
-    "controls": [],
-    "banner": "images/fnaf-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "fnaf-3": {
-    "description": "Monitor a horror attraction haunted by one main animatronic and plenty of hallucinations. Reboot failing systems, track movement, and keep Springtrap away until 6 AM.",
-    "controls": [],
-    "banner": "images/fnaf-3.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "fnaw": {
-    "description": "A fan-made survival horror game inspired by the Five Nights formula and Wario-themed characters. Watch the building, react to threats, and survive the night shift.",
-    "controls": [],
-    "banner": "images/fnaw.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "free-rider": {
-    "description": "Ride a bike across hand-drawn tracks full of jumps, slopes, and traps. Balance and momentum are everything, especially on harder custom-style courses.",
-    "controls": [],
-    "banner": "images/free-rider.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "funny-shooter-2": {
     "description": "Blast through waves of strange enemies in a colorful first-person shooter. Unlock weapons, keep moving, and clear arenas packed with ridiculous targets.",
     "controls": [],
@@ -363,45 +125,10 @@
     "cloudSync": false,
     "tags": []
   },
-  "geometry-dash-3d": {
-    "description": "Jump, dodge, and react through rhythm-platforming stages presented with a 3D twist. The challenge is all about memorizing hazards and keeping perfect timing.",
-    "controls": [],
-    "banner": "images/geometry-dash-3d.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "granny": {
     "description": "Escape a locked house while a dangerous character listens for every sound you make. Search for items, solve small puzzles, and stay hidden long enough to get out.",
     "controls": [],
     "banner": "images/granny.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "grow-a-garden": {
-    "description": "Play a browser entry for the Roblox game Grow a Garden, focused on planting, collecting, and expanding your garden over time. Build up your space, gather rewards, and keep improving what you grow.",
-    "controls": [],
-    "banner": "images/grow-a-garden.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "gta-2": {
-    "description": "Explore a top-down city in Rockstar's crime sandbox sequel with missions, vehicles, and faction chaos. Cause trouble, earn money, and navigate a busy urban playground from above.",
-    "controls": [],
-    "banner": "images/gta-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "happy-wheels": {
-    "description": "Guide fragile riders through brutal obstacle courses full of traps and physics mishaps. The dark slapstick appeal comes from barely surviving routes that were clearly built to punish mistakes.",
-    "controls": [],
-    "banner": "images/happy-wheels.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "hextris": {
-    "description": "Rotate a hexagon to catch falling colored blocks and match groups before the stack grows too high. It turns the matching-puzzle idea into a fast circular reflex test.",
-    "controls": [],
-    "banner": "images/hextris.png",
     "cloudSync": false,
     "tags": []
   },
@@ -423,41 +150,6 @@
     "description": "Build rockets and launch a penguin upward instead of just across the ice. Experiment with stages, boosters, and payloads to reach higher altitudes.",
     "controls": [],
     "banner": "images/learn-to-fly-3.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "minecraft-1.5.2": {
-    "description": "Play an older browser-accessible Minecraft build focused on mining, crafting, and blocky exploration. Gather resources, shape the world, and settle into the classic sandbox loop.",
-    "controls": [],
-    "banner": "images/minecraft-1.5.2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "minecraft-indev": {
-    "description": "Try an early Minecraft-era build with rougher edges and a snapshot-like feel. It is useful for exploring how the sandbox played before later features became standard.",
-    "controls": [],
-    "banner": "images/minecraft-indev.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "minecraft-parkour": {
-    "description": "Run and jump through Minecraft-themed parkour courses built around block spacing and timing. Every missed jump sends you back to try the route cleaner.",
-    "controls": [],
-    "banner": "images/minecraft-parkour.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "minecraft-tower-defence": {
-    "description": "Defend paths in a Minecraft-themed tower defense setup by placing defenses against incoming waves. Plan your layout, manage upgrades, and stop enemies before they reach the end.",
-    "controls": [],
-    "banner": "images/minecraft-tower-defence.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "minecraft-zeta-client": {
-    "description": "Launch Zeta Client, an Eaglercraft client for playing Minecraft-style gameplay in the browser. Use it to jump into the blocky sandbox experience without a separate install.",
-    "controls": [],
-    "banner": "images/minecraft-zeta-client.png",
     "cloudSync": false,
     "tags": []
   },
@@ -496,45 +188,10 @@
     "cloudSync": false,
     "tags": []
   },
-  "plants-vs-zombies": {
-    "description": "Defend your lawn by planting sunflowers, pea shooters, and other plants against advancing zombie waves. Each level asks you to build the right lineup before the horde reaches the house.",
-    "controls": [],
-    "banner": "images/plants-vs-zombies.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "retro-bowl": {
-    "description": "Coach and play a streamlined football season with quick passing, roster choices, and salary decisions. It captures the fun of arcade football while still letting you manage a team.",
-    "controls": [],
-    "banner": "images/retro-bowl.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "short-life": {
-    "description": "Guide a fragile character through trap-filled platforming levels where almost everything can hurt you. Careful timing and a little trial-and-error are the key to reaching the finish intact.",
-    "controls": [],
-    "banner": "images/short-life.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "slither-io": {
-    "description": "Grow a snake-like trail by eating glowing pellets while avoiding other players. Cut off rivals, protect your head, and try to become the biggest on the server.",
-    "controls": [],
-    "banner": "images/slither-io.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "slope-3": {
     "description": "Roll down a neon slope at high speed while dodging gaps, walls, and sudden turns. The longer you survive, the faster and sharper the track becomes.",
     "controls": [],
     "banner": "images/slope-3.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "slow-roads": {
-    "description": "Cruise through endless generated roads with a focus on relaxed driving rather than racing. Pick a mood, follow the scenery, and let the road keep unfolding.",
-    "controls": [],
-    "banner": "images/slow-roads.png",
     "cloudSync": false,
     "tags": []
   },
@@ -552,13 +209,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "subway-surfers": {
-    "description": "Dash along train tracks, dodge obstacles, and collect coins in a fast endless runner. Quick swipes and sharp reactions keep the chase going.",
-    "controls": [],
-    "banner": "images/subway-surfers.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "super-hot": {
     "description": "Fight through stylized combat encounters where time moves mainly when you move. Plan each step, dodge bullets, and turn split-second action into a puzzle.",
     "controls": [],
@@ -570,13 +220,6 @@
     "description": "Explore randomly generated rooms in a dark roguelike shooter filled with strange items and dangerous enemies. Each run builds a different character loadout as you push deeper underground.",
     "controls": [],
     "banner": "images/the-binding-of-isaac.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "the-legend-of-zelda-the-minish-cap": {
-    "description": "Adventure through Hyrule in a top-down Zelda quest built around shrinking to tiny size. Explore dungeons, solve puzzles, collect items, and uncover secrets from a new perspective.",
-    "controls": [],
-    "banner": "images/the-legend-of-zelda-the-minish-cap.png",
     "cloudSync": false,
     "tags": []
   },
@@ -598,97 +241,6 @@
     "description": "A fast retro-styled shooter built around aggressive movement, stylish attacks, and constant momentum. Chain weapons and movement tricks to survive arenas at breakneck speed.",
     "controls": [],
     "banner": "images/ultrakill.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex": {
-    "description": "Run, jump, slide, and wall-climb through stick-figure platforming stages full of spikes and traps. Each act is a compact test of timing and movement control.",
-    "controls": [],
-    "banner": "images/vex.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex-2": {
-    "description": "Vex 2 adds more obstacle courses, checkpoints, and precision platforming challenges. Move quickly, learn each trap, and try to clear every act cleanly.",
-    "controls": [],
-    "banner": "images/vex-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex-3": {
-    "description": "Dash through another set of Vex stages with sharper hazards and more complex routes. The game rewards fast reactions, careful jumps, and repeat attempts.",
-    "controls": [],
-    "banner": "images/vex-3.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex-6": {
-    "description": "Take on modern Vex platforming stages with daily-style challenges, skins, and plenty of traps. Precision movement is still the heart of every level.",
-    "controls": [],
-    "banner": "images/vex-6.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex-7": {
-    "description": "Vex 7 continues the stickman platforming series with new acts, hazards, and challenge modes. Expect fast restarts, tight jumps, and timing-heavy obstacle rooms.",
-    "controls": [],
-    "banner": "images/vex-7.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "vex-8": {
-    "description": "Vex 8 brings more polished stickman platforming with fresh traps and level goals. Learn the layout, move decisively, and chase cleaner clears.",
-    "controls": [],
-    "banner": "images/vex-8.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "volly-random": {
-    "description": "Play unpredictable ragdoll volleyball where each point can change the court, ball, or player setup. It is quick, silly, and especially good for two-player back-and-forth matches.",
-    "controls": [],
-    "banner": "images/volly-random.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "word-wonders": {
-    "description": "Solve word puzzles by connecting letters and filling crossword-style boards. It starts simple, then asks for sharper vocabulary and pattern recognition as the levels grow.",
-    "controls": [],
-    "banner": "images/word-wonders.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "wordle": {
-    "description": "Guess the hidden five-letter word in six tries using color feedback after each attempt. Every guess narrows the possibilities, turning vocabulary into deduction.",
-    "controls": [],
-    "banner": "images/wordle.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "yohoho-io": {
-    "description": "Battle other pirates on an island arena, collect coins, and grow stronger as you survive. Keep moving, swing at the right moment, and try to become the last pirate standing.",
-    "controls": [],
-    "banner": "images/yohoho-io.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "you-vs-100-skibidi-toilets": {
-    "description": "Fight through waves of enemies in a first-person shooter themed around brainrot internet humor. Keep moving, aim fast, and survive the Skibidi-style horde as long as you can.",
-    "controls": [],
-    "banner": "images/you-vs-100-skibidi-toilets.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "zombocalypse-2": {
-    "description": "Survive side-scrolling zombie waves with weapons, upgrades, and frantic crowd control. Stay mobile, manage pickups, and cut through the horde as long as possible.",
-    "controls": [],
-    "banner": "images/zombocalypse-2.png",
-    "cloudSync": false,
-    "tags": []
-  },
-  "voltan-launcher": {
-    "description": "Launch Voltan, an Eaglercraft client for browser-based Minecraft-style play. It gives you a quick way into the sandbox with client features packaged for the web.",
-    "controls": [],
-    "banner": "images/voltan.png",
     "cloudSync": false,
     "tags": []
   }

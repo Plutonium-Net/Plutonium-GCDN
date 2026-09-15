@@ -10,7 +10,7 @@ A collection of browser-playable games, served as standalone HTML files via a CD
 ├── details.json      # Per-game descriptions, controls, banners, sync, tags
 └── games/            # One folder per game
     ├── cookie-clicker/index.html
-    ├── minecraft-1.5.2/index.html
+    ├── motox3m/index.html
     └── ...
 ```
 

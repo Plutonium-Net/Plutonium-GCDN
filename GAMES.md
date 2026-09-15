@@ -1,0 +1,35 @@
+- 10 Minutes Till Dawn
+- Backrooms 3D
+- Bacon May Die
+- Big Flappy Tower Tiny Square
+- Big Ice Tower Tiny Square
+- Big Neon Tower Tiny Square
+- Big Tower Tiny Square 2
+- Buckshot Roulette
+- Cluster Rush
+- Cookie Clicker
+- Core Ball
+- Crazy Cattle 3D
+- Crossy Road
+- Drive Mad
+- Duck Life
+- Duck Life 2
+- Duck Life 3
+- Funny Shooter 2
+- Granny
+- Learn to Fly
+- Learn to Fly 2
+- Learn to Fly 3
+- Moto X3M
+- Moto X3M 2
+- Moto X3M 3
+- Moto X3M Spookyland
+- Moto X3M Winter
+- Slope 3
+- Snow Rider 3D
+- Soccer Random
+- Superhot
+- The Binding of Isaac
+- The World's Hardest Game
+- Tiny Fishing
+- Ultrakill
