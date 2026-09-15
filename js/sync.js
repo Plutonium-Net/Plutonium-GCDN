@@ -365,17 +365,21 @@
     try { proto.__pluHooked = true; } catch (_) {}
   })();
 
+  /* Sorted output keeps the payload byte-stable: a host that decides whether
+     to store a save by comparing serialized snapshots should not see the save
+     "change" merely because the databases were discovered in another order. */
   function listC3Dbs(cb) {
+    var done = function () { cb(c3DbNames.slice().sort()); };
     if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') {
-      return cb(c3DbNames.slice());
+      return done();
     }
     try {
       indexedDB.databases().then(function (list) {
         for (var i = 0; i < (list || []).length; i++) noteC3Name(list[i] && list[i].name);
-        cb(c3DbNames.slice());
-      }, function () { cb(c3DbNames.slice()); });
+        done();
+      }, done);
     } catch (_) {
-      cb(c3DbNames.slice());
+      done();
     }
   }
 
