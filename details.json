@@ -10,7 +10,7 @@
     "description": "Survive waves of monsters in a dark arena where every upgrade changes the rhythm of the run. Build a loadout fast, keep moving, and try to last until the timer runs out.",
     "controls": [],
     "banner": "images/10-minutes-till-dawn.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "2048-cupcakes": {
@@ -129,7 +129,7 @@
     "description": "Climb a huge tower as a tiny square while flappy-style movement makes every gap risky. Precision, patience, and quick resets are the whole challenge.",
     "controls": [],
     "banner": "images/big-flappy-tower-tiny-square.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "big-ice-tower-tiny-square": {
