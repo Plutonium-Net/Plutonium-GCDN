@@ -1014,6 +1014,65 @@
           if (stores.hasOwnProperty(name) && stores[name].length) out.push(name);
         }
         return out.sort();
+      },
+
+      /* ── One store wearing localforage's callback API ────────────────────
+
+           var lf = PluStore.stores.localforage('localforage');
+           lf.setItem('TotalDeaths_keyhs', '12', function (err) { ... });
+           lf.getItem('TotalDeaths_keyhs', function (err, value) { ... });
+
+         Construct 2's WebStorage plugin is written against the localforage
+         *global*: node-style callbacks, and no promise anywhere in it. This
+         is the instance above with the callback added, so a plugin written
+         that way keeps calling what it always called and the save still
+         lands in the one document.
+
+         The methods nothing needs are split deliberately. Configuration the
+         engine may call at startup is inert — setDriver, config and friends
+         succeed and change nothing, because the document is already open and
+         there is no driver to choose. Anything that would have to *lie*
+         about the data — length, key, iterate — throws instead, the way
+         Construct's own shim reports what it does not implement. A save is
+         never the place to guess. */
+      localforage: function (name) {
+        var store = PluStore.stores.instance(name);
+
+        function settle(promise, callback) {
+          if (typeof callback !== 'function') return promise;
+          promise.then(function (value) { callback(null, value); },
+                       function (error) { callback(error); });
+          return promise;
+        }
+
+        function notImplemented(method) {
+          return function () {
+            throw new Error('localforage.' + method + '() is not implemented by PluStore');
+          };
+        }
+
+        return {
+          getItem: function (key, callback) { return settle(store.getItem(key), callback); },
+          setItem: function (key, value, callback) { return settle(store.setItem(key, value), callback); },
+          removeItem: function (key, callback) { return settle(store.removeItem(key), callback); },
+          clear: function (callback) { return settle(store.clear(), callback); },
+          keys: function (callback) { return settle(store.keys(), callback); },
+          ready: function (callback) { return settle(store.ready(), callback); },
+
+          length: notImplemented('length'),
+          key: notImplemented('key'),
+          iterate: notImplemented('iterate'),
+
+          driver: function () { return 'plustore'; },
+          supports: function () { return true; },
+          ready_driver: function () {},
+          config: function () {},
+          setDriver: function () {},
+          defineDriver: function () {},
+          dropInstance: function () {},
+          disableMemoryMode: function () {},
+          IsUsingFallback: function () { return false; }
+        };
       }
     },
 

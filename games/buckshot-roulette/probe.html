@@ -1,13 +1,111 @@
-<!-- Pluto Game 9/11/2026 -->
+<!-- Temporary probe page — delete after verifying. -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
-    <title>Buckshot Roulette</title>
+    <title>Buckshot Roulette (probe)</title>
     <script src="../../js/plustore.js"></script>
     <script>PluStore.configure({ game: 'buckshot-roulette' });</script>
+    <script>
+    /* Watch what the player's own code asks for. Two things are captured:
+       1. the Emscripten FS, handed over by the patched seed (PluStore.boot),
+       2. the engine's own sync entry point, which is a wasm import — so the
+          WebAssembly instantiation is wrapped before the player loads, and the
+          import the engine calls when it saves is kept for inspection. */
+    (function () {
+      var calls = [];
+      window.__pluCalls = calls;
+      window.__pluFS = null;
+      window.__pluMount = null;
+      window.__gdImports = null;
+      window.__pluLog = [];
+
+      var boot = PluStore.boot, flush = PluStore.flush;
+      PluStore.boot = function (FS, mount) {
+        window.__pluFS = window.__pluFS || FS;
+        window.__pluMount = mount;
+        var r = boot.apply(this, arguments);
+        var names = [];
+        try { names = FS.readdir(mount); } catch (e) { names = ['readdir failed: ' + e.message]; }
+        window.__pluLog.push({ call: 'boot', mount: mount, docLen: (PluStore.get() || '').length, top: names });
+        return r;
+      };
+      PluStore.flush = function (FS, mount) {
+        var r = flush.apply(this, arguments);
+        window.__pluLog.push({ call: 'flush', mount: mount, docLen: (PluStore.get() || '').length });
+        return r;
+      };
+
+      /* Input is registered from the wasm side: the player calls
+         godot_js_input_*_cb(fnptr) and the glue attaches the DOM listeners that
+         call that pointer. Keeping the callbacks and the wasm table lets us
+         drive the player's real input entry point, which is what a click does. */
+      window.__inputCallbacks = {};
+      var INPUT_CBS = /^godot_js_input_(mouse_button|mouse_move|key|touch)_cb$/;
+
+      function wrapImports(imports) {
+        if (!imports) return imports;
+        for (var ns in imports) {
+          var table = imports[ns];
+          if (!table || typeof table !== 'object') continue;
+          for (var key in table) {
+            if (typeof table[key] !== 'function') continue;
+            if (INPUT_CBS.test(key)) {
+              (function (name, fn) {
+                table[name] = function (ptr) {
+                  window.__inputCallbacks[name] = { ptr: ptr, at: Date.now() };
+                  return fn.apply(this, arguments);
+                };
+              })(key, table[key]);
+              continue;
+            }
+            if (!/^godot_js_os_fs_sync$|^godot_js_os_fs_is_persistent$|^godot_js_os_finish_async$/.test(key)) continue;
+            (function (name, fn, ns) {
+              table[name] = function () {
+                var args = [];
+                for (var i = 0; i < arguments.length; i++) {
+                  args.push(typeof arguments[i] === 'function' ? '[callback]' : arguments[i]);
+                }
+                var out;
+                try {
+                  out = fn.apply(this, arguments);
+                } finally {
+                  calls.push({ fn: name, args: args, at: Date.now() });
+                  if (calls.length > 400) calls.shift();
+                }
+                return out;
+              };
+              window.__gdImports = window.__gdImports || {};
+              window.__gdImports[name] = fn;
+              window.__pluLog.push({ call: 'import-captured', name: name, ns: ns });
+            })(key, table[key], ns);
+          }
+        }
+        return imports;
+      }
+
+      function keepInstance(result) {
+        if (result && result.instance && result.instance.exports) {
+          window.__wasmTable = result.instance.exports.__indirect_function_table || null;
+        }
+        return result;
+      }
+
+      var realStreaming = WebAssembly.instantiateStreaming;
+      if (realStreaming) {
+        WebAssembly.instantiateStreaming = function (source, imports) {
+          return realStreaming.call(WebAssembly, source, wrapImports(imports)).then(keepInstance);
+        };
+      }
+      var realInstantiate = WebAssembly.instantiate;
+      WebAssembly.instantiate = function (bytes, imports) {
+        return realInstantiate.call(WebAssembly, bytes, wrapImports(imports)).then(keepInstance);
+      };
+    })();
+    </script>
+
     <link rel="stylesheet" href="style.css">
     <link id="-gd-engine-icon" rel="icon" type="image/png" href="buckshot-roulette.icon.png" />
     <link rel="apple-touch-icon" href="buckshot-roulette.apple-touch-icon.png" />
@@ -93,32 +191,7 @@
                 threads: GODOT_THREADS_ENABLED,
             });
             if (missing.length !== 0) {
-                if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
-                    let serviceWorkerRegistrationPromise;
-                    try {
-                        serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
-                    } catch (err) {
-                        serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
-                    }
-                    Promise.race([
-                        serviceWorkerRegistrationPromise.then((registration) => {
-                            if (registration != null) {
-                                return Promise.reject(new Error('Service worker already exists.'));
-                            }
-                            return registration;
-                        }).then(() => engine.installServiceWorker()),
-                        new Promise((resolve) => {
-                            setTimeout(() => resolve(), 2000);
-                        }),
-                    ]).then(() => {
-                        window.location.reload();
-                    }).catch((err) => {
-                        console.error('Error while registering service worker:', err);
-                    });
-                } else {
-                    const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
-                    displayFailureNotice(missingMsg + missing.join('\n'));
-                }
+                displayFailureNotice('Error\nThe following features required to run Godot projects on the Web are missing:\n' + missing.join('\n'));
             } else {
                 setStatusMode('progress');
                 engine.startGame({

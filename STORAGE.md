@@ -123,6 +123,7 @@ exists today:
 | Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use |
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
+| Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
 | Anything else using `localStorage` | call `getValue` / `setValue` in place of `localStorage.getItem` / `setItem` | pattern, not implemented |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -192,8 +193,9 @@ per entry, and the type tag keeps `3` and `"3"` apart. That is what
 The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
-1. **Delete the old bridge script tag.** For three of the four converted games
-   that was `<script src="../../js/sync.js"></script>`. Gone.
+1. **Delete the old bridge script tag.** Every converted game dropped
+   `<script src="../../js/sync.js"></script>` — eight games are on PluStore so
+   far, and 26 in this repo still load that bridge.
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -206,7 +208,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 9](#9-verifying-a-conversion).
+   count in [section 10](#10-verifying-a-conversion).
 
 ---
 
@@ -524,6 +526,12 @@ Tower), which is exactly what the runtime appends to both names. There is no
 mount to cut and no flush to hook: the stores ride as `@store` blocks and the
 caller keeps the promise-shaped surface it was written against.
 
+The id belongs to the *project*, not the game. Big FLAPPY Tower and Big Tower
+Tiny Square 2 both report `ldz28jk2uv2f`, so both would have opened the same two
+IndexedDB stores — a converted game inheriting the other's save. Under PluStore
+they cannot collide: the store names stay exactly as the runtime asked for them
+inside the document, but each game's document lives under its own slot.
+
 ### 8.1 Load PluStore before the runtime
 
 In the page's `<head>`, before `scripts/main2.js`. That script is a module that
@@ -538,7 +546,64 @@ the race:
 `game` alone is enough — the slot becomes `plu:text:<game>`. There is no
 `filePrefix` here: store names already carry the project id.
 
-### 8.2 Make the engine local first, and check it
+### 8.2 Check whether the assets are local at all
+
+Some exports are *preview* builds: they ship the engine and a `data.json`, but
+`data.json` points every image, font, sound and loose JSON at the developer's
+Construct preview host — a third-party machine that can be overwritten or die.
+The wrapper page looks local because it proxies one file tree; the game is not
+offline at all.
+
+```bash
+grep -o 'https\?://[A-Za-z0-9./_%:?=&#@+~-]*' games/<game>/data.json | sort -u | head
+```
+
+Big Tower Tiny Square 2 is one of these: **731** references to
+`https://<id>.preview.editmysite.com/uploads/b/<id>/files/…`, plus five more
+hard-coded in `main.js` and `c3runtime.js` (the engine script,
+`dispatchworker.js`, `jobworker.js`, `data.json` itself and `box2d.wasm`). All
+of them have to go local before any patch to the runtime can matter.
+
+1. **Download what the prefix names.** Not just the URLs the file mentions:
+   `fonts/`, `icons/` and `media/` appear as bare *base* paths, with the file
+   names living in the font and audio lists. Build the list from both, then
+   fetch `data.json`, the loose `.json` files, `images/`, `media/`, `fonts/`,
+   `icons/`, plus `scripts/dispatchworker.js`, `scripts/jobworker.js` and
+   `box2d.wasm` from `.../files/`.
+2. **Delete the prefix.** Every URL becomes a path relative to the page, which
+   is the form a proper local export already uses:
+
+   ```python
+   raw = raw.replace('https://<id>.preview.editmysite.com/uploads/b/<id>/files/', '')
+   ```
+
+3. **Prune the media variants that were never published.** `data.json` records
+   more variants than were uploaded — mostly `audio/mp4` (`.m4a`) beside the
+   `ogg`/`webm` for the same sound, none of which exist anywhere. The runtime
+   picks the first supported type, so a dead variant is an invitation to a 404
+   during load. Drop every variant whose file is not on disk, then check the
+   whole reference list:
+
+   ```python
+   missing = [r for r in references(raw) if not os.path.exists(r)]
+   ```
+
+Two traps when judging the result:
+
+- **The number after an image path is not the file size.** It is the
+  *pre-export* size, so a downloaded PNG at 17 % of it is not corrupt — and the
+  same sheet name in a sibling game is a different image entirely. Do not
+  verify assets by size. If you want a signal, compare the frame rects the
+  entry carries against the PNG's real dimensions, and expect a few apparent
+  overflows even in a known-good game: a control run on Big FLAPPY Tower's own
+  files flags nine.
+- **A shared preview host is not a stable source.** One project's upload can
+  overwrite another's file of the same name. Prefer a byte-exact copy from
+  elsewhere in the repo when one exists: 56 of this game's sounds came from
+  `big-flappy-tower-tiny-square` — same names, same bytes, same developer's
+  shared sound library.
+
+### 8.3 Make the engine local first, and check it
 
 **Do this before anything else, and verify it.** A Construct export that was
 being served from a CDN keeps the CDN copies of its own engine in
@@ -588,7 +653,59 @@ methods and no network calls of its own — so vendoring it is a copy plus one
 line: `sdkElem.src = './cg-sdk.js';`. The vendored copy stays byte-identical to
 what the CDN served; only the URL in the loader is edited.
 
-### 8.3 Patch the two construction sites
+### 8.4 Third-party plugins the engine injects
+
+An export can reach for the network through a file the page never mentions. Big
+NEON Tower's `index.html` has no remote scripts at all, and the game still
+loaded one: the `GM_SDK` plugin inside `scripts/c3runtime.js` injects its own
+script tag when the plugin is constructed. It is a single minified line in the
+file, wrapped here and nowhere else altered:
+
+```js
+(function(a,c,d){var f=a.getElementsByTagName(c)[0];
+ a.getElementById(d)||(a=a.createElement(c),a.id=d,
+ a.src="https://cdn.jsdelivr.net/gh/st39/sdk@main/sdk.js",f.parentNode.insertBefore(a,f))})
+ (document,"script","gamemonetize-sdk")
+```
+
+So grep the engine, not only the page:
+
+```bash
+grep -o 'https\?://[A-Za-z0-9./_%:?=&#@+~-]*' games/<game>/scripts/*.js games/<game>/*.js | sort -u
+```
+
+Big FLAPPY Tower's SDK could be vendored unchanged, because the file the CDN
+served was itself a self-contained stub. This one is a real ad client, so the
+offline copy is a stand-in — and the loader URL has to become a local path
+rather than be deleted, because **deleting it breaks the game**. The plugin's
+own guard is a substring test on a value that is not a string:
+
+```js
+ShowAd(){ var e=window.sdk; "undefined"!==e && "undefined"!==e.showBanner && e.showBanner() }
+```
+
+`"undefined" !== e` is true for an undefined `e`, so the guard passes and the
+next property access throws. While the real SDK loaded, the bug could never
+fire; drop the loader and the game dies on its first ad call.
+
+`games/big-neon-tower-tiny-square/gmsdk.js` is the stand-in. It honours the
+contract the plugin expects, which is worth reading out of the plugin rather
+than approximating: the constructor installs `window.SDK_OPTIONS =
+{ gameId, onEvent }` and runs its whole state machine off the events delivered
+there — `SDK_READY` raises `sdkReady`, `SDK_GAME_PAUSE` sets `adPlaying`,
+`SDK_GAME_START` clears it, and `COMPLETE` raises `adViewed` for five seconds,
+which is exactly what the plugin's `PauseGame` / `ResumeGame` / `AdViewed`
+conditions test. A stand-in that accepts the calls and announces nothing leaves
+the game in its paused state; one that emits `SDK_GAME_PAUSE` then
+`SDK_GAME_START` from `showBanner` / `showAd` keeps every condition where a
+player would be.
+
+One timing detail: the plugin assigns `window.SDK_OPTIONS` inside its own
+constructor, which has not returned yet when the injected script executes, so
+the stand-in announces readiness on the next turn (`setTimeout(…, 0)`) instead
+of during its own evaluation.
+
+### 8.5 Patch the two construction sites
 
 Both stores are built in `c3runtime.js`, inside the localforage shim. Site one
 is `createInstance`, which is how the runtime asks for either store:
@@ -625,7 +742,7 @@ Four details are easy to get wrong:
 - **`new e(k)` is the IndexedDB driver, and it is lazy.** Never constructing it
   is why `indexedDB.open` is called *zero* times rather than "writes nothing".
 
-### 8.4 What the game then does through it
+### 8.6 What the game then does through it
 
 The runtime reads its save at boot — one `getItem('FlappySaveGame')` on the
 LocalStorage store for this game — and writes when the game saves. A slot save
@@ -635,7 +752,16 @@ save that is a single text field. Keys are sorted in the document and an
 emptied store leaves no block, so the same save always serialises to the same
 bytes.
 
-### 8.5 Store values carry a type tag
+The key is not always findable in the project's own files, and when it is not,
+that is the fastest thing to learn about a build. Big NEON Tower's key is the
+literal `SaveGame`, which greps in one second; Big Tower Tiny Square 2 reads and
+writes exactly one key, `reduxSaveGame`, and that string
+**never appears** in its `data.json` — it is built at runtime from a `gameName`
+variable (`"redux"`) plus a suffix. Grepping the project data is still the
+fastest way to find a key; when that comes up empty, wrap the store and watch
+what the game asks for ([section 10](#10-verifying-a-conversion)).
+
+### 8.7 Store values carry a type tag
 
 | Tag | Value |
 |---|---|
@@ -655,17 +781,257 @@ produces a save that reads back as the wrong type — the same class of failure 
 storing binary as UTF-8. Everything the codec accepts comes back out of
 `getItem` exactly as it went in.
 
-### 8.6 The storage inspector
+### 8.8 The storage inspector
 
 `games/big-flappy-tower-tiny-square/storage.html` frames the game beside a live
 panel: one table per store (key, type, decoded value), the decoded value of the
 selected key, and the raw document, with Copy, Export `.txt`, Import, Reload and
 Reset. Both known store names are listed before the game has written anything, so
 an empty store and a missing one do not look identical.
+`games/big-tower-tiny-square-2/storage.html` is the same panel, and is one place
+where a shared project id shows up: three EO Interactive titles — Big FLAPPY,
+Big Tower Tiny Square 2 and Big NEON Tower — carry the same Construct project id
+`ldz28jk2uv2f`, so all three panels list the same store names. Nothing mixes,
+because each game keeps its own document under `plu:text:<game>`; the documents
+are what the panel labels with the slot key at the top.
 
 ---
 
-## 9. Verifying a conversion
+## 9. Construct 2 HTML5
+
+A Construct 2 export keeps its save the way a Construct 3 export does — a
+key/value store reached through the bundled **localforage** — so the adapter is
+the same and the patch is one line. What earns it its own section is everything
+else a C2 export carries: project data behind a hard-coded developer URL, an
+empty canvas painted over the game's, and every input arriving through the
+Touch plugin whether or not the device has a touchscreen.
+
+`games/big-ice-tower-tiny-square` is the converted example. It had never worked
+in a browser, and the reasons had nothing to do with storage — which is the
+argument for localizing and testing a game *before* touching how it saves.
+
+### 9.1 Load PluStore before the runtime
+
+`2min.js` is jQuery 2.1.1, `runtimee.js` is the C2 runtime, and the runtime
+needs jQuery, so the order is fixed:
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>PluStore.configure({ game: 'big-ice-tower-tiny-square' });</script>
+...
+<script src="2min.js"></script>
+<script src="runtimee.js"></script>
+<script>jQuery(document).ready(function () { cr_createRuntime("c2canvas"); });</script>
+```
+
+Delete `sync.js`. Delete the service-worker registration too — the export calls
+`window.C2_RegisterSW()` on boot, and a cache that outlives an edit is a lie:
+the runtime only calls it if it exists, so removing the definition is enough.
+
+### 9.2 Three things the export hides
+
+**The project data has two URLs, and the wrong one wins.** `runtimee.js` selects
+`data.js` on the developer's host unless the runtime is in its own preview mode:
+
+```js
+var e = "https://<developer host>/uploads/<id>/files/data.js";
+if (this.MC || this.Sp || this.Sx || this.Rx) e = "data.json";
+```
+
+On a CMS host that URL does not return the project at all — it returns an
+injected page script. The game then boots to nothing: no error, no scene, no
+menu, because the loader parsed a CMS script as project data. Cut the branch so
+`data.json` is the only path, and delete any `data.js` the download brought with
+it. This is the reason the game "did not work", and no amount of storage work
+would have fixed it.
+
+**A second, empty `<canvas>` sits over the game's own.** The export emits two:
+`#c2canvas` (the WebGL surface the runtime draws into) and a bare
+`<canvas width=… height=…>` positioned absolutely on top of it. The overlay has
+no context and no listeners, but it wins every hit test, so clicks land on a
+dead element and the game never sees them. The menu is unclickable in any
+browser until it gets `pointer-events: none` (or is deleted). Check for this on
+any C2 export from a portal: `document.elementFromPoint()` in the middle of the
+canvas should answer `c2canvas`, not `CANVAS`.
+
+The same wrapper also carries the download's entry point, so keep its structure
+— the `#c2canvasdiv` sizing, the `cr_createRuntime("c2canvas")` call and the
+`visibilitychange` suspend/resume handlers — and change only what must change.
+
+**The asset list is by name, not by path.** `data.json` records sounds as
+`[["jump.ogg", 14690], …]` and the runtime fetches them from `media/`, images
+from `images/`. Those `size` fields are the *pre-export* sizes, so they are not
+a way to verify a download: the host recompresses uploads, and this game's
+originals came back smaller than recorded. Resolve sounds the same way the
+filesystem does — `media/<name>` — and prune variants no host ever published,
+because a missing `.m4a` beside every `.ogg` is a 404 on the first play.
+
+### 9.3 The patch: one localforage global
+
+The runtime bundles localforage as a UMD module, and its tail is the whole
+conversion:
+
+```js
+"object" === typeof exports ? exports.localforage = ud()
+  : this.localforage = self.PluStore && self.PluStore.stores
+      ? self.PluStore.stores.localforage("localforage") : ud()
+```
+
+C2's WebStorage plugin is written against the localforage **global**, in
+node-style callbacks with no promise anywhere in it, which is the one API
+`stores.localforage(name)` exists for. Two more sites are the runtime's own
+save/load driver — compiled into every C2 build even when no event uses it —
+which writes a `saves` object store in `_C2SaveStates` and falls back to
+`localStorage["__c2save_" + name]`:
+
+```js
+function g(a, b, c, e) {   /* put state b under name a */
+  if (self.PluStore && self.PluStore.stores) {
+    self.PluStore.stores.instance("_C2SaveStates").setItem(a, b).then(c, e);
+    return;
+  }
+  ...
+```
+
+and its read twin `e(a, b, c)`, plus the two `localStorage.getItem("__c2save_" + n)`
+fallbacks, which become `self.PluStore && self.PluStore.stores ? "" : localStorage.getItem(…)`
+so the old store is never read. No event in this build drives them — the slot
+name comes from actions the export does not contain — but a dormant path that
+still reads the old store is a save that silently disagrees with itself the day
+a build does use it. Patch it, and list it in the inspector as a store that
+exists but holds nothing.
+
+**If the export bundles a real localforage**, which C2 does whenever the
+WebStorage plugin is present, then `stores.localforage()` must answer the same
+calls the plugin makes and no more: `getItem`, `setItem`, `removeItem`, `clear`,
+`keys`, `ready`, plus inert `setDriver`/`config`/`defineDriver`. Anything that
+would have to *invent* an answer — `length`, `key`, `iterate` — throws, the way
+the engine's own shim reports what it does not implement.
+
+### 9.4 What the game then saves
+
+The store is named `localforage`, which is the global's own name rather than a
+project id: C2 predates per-project store names, so every C2 build on an origin
+would share the slots if the document were shared. It is not shared — the
+document is keyed `plu:text:<game>` — but that is worth knowing before
+diagnosing "the wrong save loaded".
+
+Keys are the game's own, and their shape is a per-title convention:
+
+| key | tag |
+|---|---|
+| `TotalDeaths_keyhs` | `num` |
+| `TotalJumps_keyhs` | `num` |
+| `respawnX_keyhs`, `respawnY_keyhs` | `num` |
+| `Gametime_keyhs` | `num` |
+| `RescueTime_keyhs` | `num` |
+| `Finishedstate_keyhs` | `str` |
+| `KillTime_keyhs` | `num`, absent until the first rescue |
+
+The eight values are written on the game's own auto-save (its controls text
+says "Auto-Saves every 1…"), so on a fresh install the document appears within
+seconds of pressing start, filled with defaults — `Gametime 0`, `TotalDeaths 0`,
+`respawnX 128`, `respawnY 8896`, `Finishedstate "towerclimb"`. Values are
+written as numbers and read back as numbers, which is worth checking rather than
+assuming: no store in C2 is stringly-typed, and a save that comes back as
+`"128"` is a different save.
+
+### 9.5 Why the mouse looks dead, and what really drives a C2 menu
+
+A C2 build can carry two input plugins, and this is the part that will waste an
+afternoon if it is not known up front.
+
+**The Touch plugin ignores the mouse.** Its handlers open with
+`if (a.pointerType !== a.MSPOINTER_TYPE_MOUSE && "mouse" !== a.pointerType)`,
+so a pointer event from a mouse is dropped on the floor — on every modern
+browser, because they all support `PointerEvent`. What makes C2 mouse input work
+anyway is a jQuery bridge registered in the same plugin's init:
+
+```js
+this.hN && !this.j.jc && (
+  jQuery(document).mousemove(function (a) { d.Uy(a) }),
+  jQuery(document).mousedown(function (a) { d.Ty(a) }),
+  jQuery(document).mouseup(function (a) { d.Vy(a) })
+);
+```
+
+`Ty` synthesizes a touch at the click point and runs the touch-start triggers;
+`Vy` synthesizes the touch end and runs the tap logic. So a real mouse click
+reaches the game as a **tap**, and the Touch object answers it.
+
+That leaves four ways a *synthetic* input test lies to you:
+
+- A synthetic `MouseEvent` has `which === 0`; the Mouse plugin records
+  `this.Mm = a.which - 1`, so "left button" conditions see `-1`. A trusted click
+  has `which === 1`.
+- The Mouse plugin tracks the pointer position **only on move** (`this.hj`,
+  `this.ij`). A trusted click with no preceding move tests where the pointer was
+  last seen, which is not where it is.
+- The Touch plugin's tap needs press and release inside 333 ms, at the same point
+  (under 15 px of travel). Hold for 500 ms and the press becomes a **long press**,
+  which cancels the tap — so "click and hold" is not a stronger test, it is a
+  different gesture.
+- **The title menu need not be mouse-driven.** For this game, a single `Space`
+  keydown moves the camera off the menu and into the level — verified from a
+  fresh load, one key, nothing else — while no click gesture I could synthesize
+  started it, trusted or not, with the position tracked and the left button set.
+  Try the keyboard before concluding input is broken.
+
+What *is* worth asserting while testing is the plumbing, not the game's reaction
+to it. All four of these held for this conversion, and each is one expression in
+the page: `document.elementFromPoint()` at the centre of the canvas answers
+`c2canvas`; the Touch plugin instance's `touches` array grows on mousedown (so
+`Ty` ran) and empties on mouseup (so `Vy` ran); the point it recorded
+(`this.Mi`, `this.Ni`) converts through the button's own layer into the button's
+box; and `runtime.Ao(buttonType, x, y, false)` finds an instance there. Given
+that, an unresponsive menu is the game's logic, not the harness's.
+
+### 9.6 Verifying without being able to play
+
+C2 has no `c3_callFunction`, and this game's save is driven by its own auto-save
+and by menu items, so the way in is to observe the plugin instead of pressing
+buttons. A temporary copy of the game page — `index.html` plus one script
+inserted after the `PluStore.configure` line, before the runtime — wraps the
+factory the runtime resolves its global from:
+
+```js
+var factory = PluStore.stores.localforage;
+PluStore.stores.localforage = function (name) {
+  var lf = factory.call(PluStore.stores, name);
+  ['getItem', 'setItem', 'removeItem', 'clear', 'keys'].forEach(function (m) {
+    var orig = lf[m];
+    lf[m] = function () {
+      var args = [].slice.call(arguments);
+      var entry = { m: m, key: String(args[0]) };
+      log.push(entry);
+      return orig.apply(lf, args).then(function (v) { entry.result = v; return v; });
+    };
+  });
+  return lf;
+};
+```
+
+With that in place, one boot gives both directions at once, and neither needs the
+menu:
+
+- **The game's own read path.** It reported fifteen `getItem` calls for the eight
+  keys, every one settling — which is also the honest check that the callback
+  bridge works, since a plugin written for callbacks does not await promises.
+- **The game's own write path.** Playing a few seconds by hand (or by key — this
+  game's jump is `Space`) produced `setItem` calls, and `stats().storeWrites`
+  rose with them: `Gametime`, `TotalJumps` and `respawnX`/`respawnY` all moved in
+  the document as the character moved on screen.
+- **The round trip.** Write distinctive values through the same callback API
+  (`TotalDeaths 42`, `TotalJumps 777`, `Gametime 4242`, `Finishedstate "plutest"`,
+  `respawn 4321/8765`), reboot, and read the log: the game's *own* reads come back
+  with those exact values.
+- **The control.** Clear the document and boot again. The game writes genuine
+  defaults (`TotalDeaths 0`, `TotalJumps 0`, `respawn 128/8896`) — without this
+  step, "my values survived" and "the game never read anything" look identical.
+
+---
+
+## 10. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success.
@@ -706,7 +1072,7 @@ failure mode that looks like success.
    parse.
 5. **No errors.** `PluStore.stats().lastError` is `null` after a boot and a save.
 
-When the old store is IndexedDB [section 8.2](#82-make-the-engine-local-first-and-check-it)
+When the old store is IndexedDB [section 8.3](#83-make-the-engine-local-first-and-check-it)
 has already taught you not to trust a check that only looks at the store: the
 patch can be inert while the store sits quietly at its old contents. The
 strongest version of checks 2 and 5 is to instrument the page instead of the
@@ -745,9 +1111,35 @@ For Big FLAPPY Tower that reads back as: `idbOpens` empty, and one call at boot
 the keys the game really uses, without guessing from its data files. Delete the
 probe page when the conversion is confirmed.
 
+You do not have to *play* the game to see it write, either. The runtime exposes
+`self.c3_callFunction(name)`, and the export's own function names are sitting in
+`data.json` as function-call actions (`[-2,"Save",null,…]`) — so
+`self.c3_callFunction('Save')` runs the game's real save routine and pushes its
+real payload through the patched store. That is a far better test than flailing
+at the canvas, which a headless webview makes unreliable anyway (no window
+focus, synthetic pointer events that a menu may ignore). Big Tower Tiny Square 2
+wrote its whole `reduxSaveGame` dictionary that way; editing three fields in the
+document first then proved the round trip, because the game read the edited
+values at boot and wrote them back unchanged.
+
+Two things Big NEON Tower made worth doing on top of that:
+
+- **Run the control.** Clear the store, boot again, and let the game save. If it
+  now writes its *defaults* — the language back to `english`, `TotalDeaths: 0`,
+  no trace of the key you injected — then the earlier run really did read the
+  document, and those values were not leftovers from your own edit. Without this
+  step, "my values survived" and "the game never wrote at all" look the same.
+- **Do not read a first-run log line as a conversion fault.** Big NEON Tower logs
+  `Error parsing JSON: Unexpected end of JSON input` from its own dictionary
+  plugin whenever there is no save to load: the game feeds an empty result
+  straight into a JSON parse. localforage returns `null` for a missing key and so
+  does `PluStore.stores`, so a first-time player saw the same error on the
+  original store. It appears only on a fresh save — boot one with a populated
+  save and compare before suspecting the patch.
+
 ---
 
-## 10. Inspecting a save
+## 11. Inspecting a save
 
 Every converted game has one, and they take the shape the engine needs:
 
@@ -759,6 +1151,11 @@ Every converted game has one, and they take the shape the engine needs:
 - `games/big-flappy-tower-tiny-square/storage.html` — one table per key/value
   store (key, type, decoded value), the decoded value of the selected key, and
   the raw document.
+- `games/big-tower-tiny-square-2/storage.html` — the store panel again, for a
+game whose two store names collide with Big FLAPPY Tower's.
+- `games/big-ice-tower-tiny-square/storage.html` — the store panel for a
+  Construct 2 build: one populated store named `localforage`, and a second
+  listed store (`_C2SaveStates`) that exists but holds nothing.
 
 All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
 Reload and Reset, and all of them listen for the `postMessage` that every write
@@ -769,7 +1166,7 @@ To reuse one for another game, copy the page and change two things: the iframe
 
 ---
 
-## 11. Backends
+## 12. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -790,7 +1187,7 @@ needs to change.
 
 ---
 
-## 12. Reference
+## 13. Reference
 
 ### API
 
@@ -806,6 +1203,7 @@ needs to change.
 | `files.remove(name)` | delete it |
 | `files.list()` / `files.names()` | `[{name, size}]` / sorted names |
 | `stores.instance(name)` | a localforage-shaped store: `getItem` / `setItem` / `removeItem` / `clear` / `keys`, all promise-returning |
+| `stores.localforage(name)` | the same store with node-style callbacks instead, for an engine written against the localforage global |
 | `stores.names()` | names of the stores the document holds, sorted |
 | `stores.entries(name)` | `[{key, tag, value}]`, decoded, for an inspector |
 | `prefs()` | the first PlayerPrefs block, decoded |
@@ -846,7 +1244,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 13. Known limits
+## 14. Known limits
 
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
@@ -875,9 +1273,19 @@ is what makes a re-encode safe to hand back.
   small and greppable, but a re-export means re-checking them, the same way a
   re-downloaded Unity framework file silently undoes a Unity conversion.
 - **A remote engine script makes the patch inert.** If a Construct export still
-  lists a CDN copy in `engineScripts` ([section 8.2](#82-make-the-engine-local-first-and-check-it)),
+  lists a CDN copy in `engineScripts` ([section 8.3](#83-make-the-engine-local-first-and-check-it)),
   the game boots the remote runtime and nothing in this document happens. It is
   the one failure that looks exactly like success, so check it first.
+- **A preview export's assets can live on someone else's host.** Big Tower Tiny
+  Square 2 does ([section 8.2](#82-check-whether-the-assets-are-local-at-all)).
+  Everything now resolves inside the game folder, but the copy is only as
+  complete as that host was: 3 of its 10 music tracks came back at a quarter of
+  their size and 7 were missing outright, so the local build has less music than
+  the CDN version would have had if the files still existed.
+- **A referenced file that was never published stays missing.**
+  `creditslanguage.json` is fetched by AJAX at boot in both Big Tower games and
+  404s everywhere, the CDN copy included; the runtime logs one caught JSON error
+  and carries on. Not a conversion artefact, and not worth chasing.
 - **Stores with no entries vanish.** `clear()` on a store removes its block, and
   a store whose entries were all removed leaves no trace in the document. What
   is left is the truth about the save, but it does mean the document cannot
