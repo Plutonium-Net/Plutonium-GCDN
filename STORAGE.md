@@ -95,9 +95,10 @@ PluStore.set(document);
 
 Building that document is the only engine-specific part. For Unity the engine
 does it for you (`flush`, see [section 6](#6-unity-webgl)), and for GameMaker
-`PluStore.files` does (see [section 7](#7-gamemaker-html5)); for anything else
-you serialise the engine's own storage into the format in
-[section 4](#4-document-format).
+`PluStore.files` does (see [section 7](#7-gamemaker-html5)); for a
+key/value engine `PluStore.stores` does (see
+[section 8](#8-construct-3-html5)); for anything else you serialise the
+engine's own storage into the format in [section 4](#4-document-format).
 
 ### 3.4 Restore the save
 
@@ -121,8 +122,8 @@ exists today:
 |---|---|---|
 | Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use |
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
+| Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Anything else using `localStorage` | call `getValue` / `setValue` in place of `localStorage.getItem` / `setItem` | pattern, not implemented |
-| Anything using `localforage` / Construct 3 IndexedDB | read the store, serialise into `@text` blocks | pattern, not implemented |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
 returns a document, one that takes a document and rebuilds the engine's save.
@@ -154,6 +155,9 @@ header	<hex>              ←   7 header bytes, preserved verbatim
 @file <name>               ← one named file, for a host that keeps files flat
 <the file's text, escaped onto a single line>
 @end
+@store <name>              ← one key/value store, for an engine whose save is a
+<key>\t<tag>\t<value>      ←   set of stores; one escaped line per entry, sorted
+@end
 ```
 
 Five rules matter:
@@ -176,6 +180,10 @@ Unity PlayerPrefs. A Construct save slot, a GameMaker save file, a JSON blob —
 all of them become blocks keyed by whatever path or name you like. `@file` is
 the same idea for an engine whose save is a *flat set of named files* rather
 than a filesystem, and it is what [section 7](#7-gamemaker-html5) uses.
+`@store` is the same again for an engine whose save is neither a filesystem nor
+a set of files but a set of *key/value stores*: one block per store, one line
+per entry, and the type tag keeps `3` and `"3"` apart. That is what
+[section 8](#8-construct-3-html5) uses.
 
 ---
 
@@ -198,7 +206,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 8](#8-verifying-a-conversion).
+   count in [section 9](#9-verifying-a-conversion).
 
 ---
 
@@ -501,7 +509,163 @@ inside the save file.
 
 ---
 
-## 8. Verifying a conversion
+## 8. Construct 3 HTML5
+
+A Construct 3 export keeps no files at all. Its save is two key/value stores,
+created through `localforage.createInstance`:
+
+| Store | Holds |
+|---|---|
+| `c3-localstorage-<project id>` | the LocalStorage plugin — the game's own keys |
+| `c3-savegames-<project id>` | whole-game save slots, one JSON string each |
+
+`<project id>` is `data.json` → `project[31]` (`ldz28jk2uv2f` for Big FLAPPY
+Tower), which is exactly what the runtime appends to both names. There is no
+mount to cut and no flush to hook: the stores ride as `@store` blocks and the
+caller keeps the promise-shaped surface it was written against.
+
+### 8.1 Load PluStore before the runtime
+
+In the page's `<head>`, before `scripts/main2.js`. That script is a module that
+fetches the engine dynamically, so a plain classic script above it always wins
+the race:
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>PluStore.configure({ game: 'big-flappy-tower-tiny-square' });</script>
+```
+
+`game` alone is enough — the slot becomes `plu:text:<game>`. There is no
+`filePrefix` here: store names already carry the project id.
+
+### 8.2 Make the engine local first, and check it
+
+**Do this before anything else, and verify it.** A Construct export that was
+being served from a CDN keeps the CDN copies of its own engine in
+`scripts/main2.js`:
+
+```js
+window.c3_runtimeInterface = new self.RuntimeInterface({
+  useWorker: !1,
+  workerMainUrl: "workermain.js",
+  engineScripts: [
+    "https://cdn.jsdelivr.net/gh/<owner>/<repo>@main/<path>/scripts/c3runtime.js",
+  ],
+  scriptFolder:
+    "https://cdn.jsdelivr.net/gh/<owner>/<repo>@main/<path>/scripts/",
+});
+```
+
+That is not a fallback list — it is the engine script URL, resolved through
+`new URL(engineScripts[0], baseUrl)`. While it points at the CDN the game boots
+the *remote* `c3runtime.js`: the local patch never runs, IndexedDB keeps
+working, and nothing looks broken. Both lines have to become local paths, which
+resolve against the page's own directory:
+
+```js
+    engineScripts: [ "scripts/c3runtime.js" ],
+    scriptFolder:  "scripts/",
+```
+
+Then confirm the two copies are the same bytes, so repointing changes only the
+URL and not the game:
+
+```bash
+curl -s "https://cdn.jsdelivr.net/gh/<owner>/<repo>@main/<path>/scripts/c3runtime.js" \
+  -o /tmp/cdn-c3runtime.js && diff /tmp/cdn-c3runtime.js \
+  <(git show HEAD:games/<game>/scripts/c3runtime.js) && echo identical
+```
+
+These builds usually pull one more thing from a third host. In Big FLAPPY Tower
+`Construct3CrazySDK.js` injects an ad SDK:
+
+```js
+sdkElem.src = 'https://sdk.enjoy4fun.com/v1/cg-sdk.js';
+```
+
+That file is a self-contained stub — `window.CrazyGames.CrazySDK` with inert
+methods and no network calls of its own — so vendoring it is a copy plus one
+line: `sdkElem.src = './cg-sdk.js';`. The vendored copy stays byte-identical to
+what the CDN served; only the URL in the loader is edited.
+
+### 8.3 Patch the two construction sites
+
+Both stores are built in `c3runtime.js`, inside the localforage shim. Site one
+is `createInstance`, which is how the runtime asks for either store:
+
+```js
+    createInstance(k) {
+      if ("object" !== typeof k) throw new TypeError("invalid options object");
+      k = k.name;
+      if ("string" !== typeof k) throw new TypeError("invalid store name");
+      if (self.PluStore && self.PluStore.stores) return self.PluStore.stores.instance(k);
+      k = new e(k);
+      return new g(k)
+    }
+```
+
+Site two is the default instance, at the end of the same shim:
+
+```js
+  self.localforage = self.PluStore && self.PluStore.stores ? self.PluStore.stores.instance("localforage") : new g(new e("localforage"))
+```
+
+Four details are easy to get wrong:
+
+- **The guard is on `self.PluStore`, not on a bare `PluStore`.** The same file
+  also runs inside a Web Worker when the export uses one; that scope has no
+  PluStore, and the worker has to keep the original path instead of crashing.
+- **`createInstance` is enough for both stores**, because
+  `c3-localstorage-…` and `c3-savegames-…` are the only names the runtime ever
+  asks for. The patch also covers the default `localforage` object, so a user
+  script calling it directly lands in the same document.
+- **The surface is small.** `self.IStorage` and the save-slot code call exactly
+  `getItem`, `setItem`, `removeItem`, `clear` and `keys`; the runtime also
+  touches `ready()`, `IsUsingFallback()` and `disableMemoryMode()`.
+- **`new e(k)` is the IndexedDB driver, and it is lazy.** Never constructing it
+  is why `indexedDB.open` is called *zero* times rather than "writes nothing".
+
+### 8.4 What the game then does through it
+
+The runtime reads its save at boot — one `getItem('FlappySaveGame')` on the
+LocalStorage store for this game — and writes when the game saves. A slot save
+(`rt._DoSaveToSlot(name)`, the same call the Save/Load events use) writes one
+large JSON string: **138 KB** for Big FLAPPY Tower, a useful stress case for a
+save that is a single text field. Keys are sorted in the document and an
+emptied store leaves no block, so the same save always serialises to the same
+bytes.
+
+### 8.5 Store values carry a type tag
+
+| Tag | Value |
+|---|---|
+| `str` | string |
+| `num` | number — `-0`, `NaN` and `Infinity` included |
+| `bool` | boolean |
+| `null` / `undef` | `null` / `undefined` |
+| `date` | a `Date`, as its ISO string |
+| `ab` / `u8` | `ArrayBuffer` / `Uint8Array`, as base64 |
+| `json` | plain objects and arrays, when every leaf is JSON-safe |
+
+Anything else — a `Map`, a `Set`, a `Float64Array`, a function, an object
+holding a `Date` — is **refused**: `setItem` resolves without storing, and
+`stats().lastError` says what and why. That is deliberate. A store holds
+structured-clone data, so quietly writing `"[object Map]"` or the *string* `"3"`
+produces a save that reads back as the wrong type — the same class of failure as
+storing binary as UTF-8. Everything the codec accepts comes back out of
+`getItem` exactly as it went in.
+
+### 8.6 The storage inspector
+
+`games/big-flappy-tower-tiny-square/storage.html` frames the game beside a live
+panel: one table per store (key, type, decoded value), the decoded value of the
+selected key, and the raw document, with Copy, Export `.txt`, Import, Reload and
+Reset. Both known store names are listed before the game has written anything, so
+an empty store and a missing one do not look identical.
+
+---
+
+## 9. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success.
@@ -542,9 +706,48 @@ failure mode that looks like success.
    parse.
 5. **No errors.** `PluStore.stats().lastError` is `null` after a boot and a save.
 
+When the old store is IndexedDB [section 8.2](#82-make-the-engine-local-first-and-check-it)
+has already taught you not to trust a check that only looks at the store: the
+patch can be inert while the store sits quietly at its old contents. The
+strongest version of checks 2 and 5 is to instrument the page instead of the
+store — a temporary copy of the game page, booted with two wrappers installed
+before the engine loads:
+
+```html
+<script>
+  window.__probe = { idbOpens: [], calls: [] };
+  var realOpen = IDBFactory.prototype.open;
+  IDBFactory.prototype.open = function (name) {
+    window.__probe.idbOpens.push(String(name));
+    return realOpen.apply(this, arguments);
+  };
+</script>
+<script src="../../js/plustore.js"></script>
+<script>
+  PluStore.configure({ game: '<game>' });
+  var realInstance = PluStore.stores.instance;
+  PluStore.stores.instance = function (name) {
+    var real = realInstance.call(PluStore.stores, name);
+    var wrapped = {};
+    ['getItem', 'setItem', 'removeItem', 'clear', 'keys'].forEach(function (m) {
+      wrapped[m] = function (a, b) {
+        window.__probe.calls.push({ store: String(name), method: m, key: String(a) });
+        return real[m].apply(real, arguments);
+      };
+    });
+    return wrapped;
+  };
+</script>
+```
+
+For Big FLAPPY Tower that reads back as: `idbOpens` empty, and one call at boot
+(`c3-localstorage-ldz28jk2uv2f.getItem('FlappySaveGame')`) — which also names
+the keys the game really uses, without guessing from its data files. Delete the
+probe page when the conversion is confirmed.
+
 ---
 
-## 9. Inspecting a save
+## 10. Inspecting a save
 
 Every converted game has one, and they take the shape the engine needs:
 
@@ -553,6 +756,9 @@ Every converted game has one, and they take the shape the engine needs:
 - `games/bacon-may-die/storage.html` — the file list (name, type, size, first
   line), a decoded view of the selected file (an `.ini` as key/value rows, a
   `.json` pretty-printed), and the raw document.
+- `games/big-flappy-tower-tiny-square/storage.html` — one table per key/value
+  store (key, type, decoded value), the decoded value of the selected key, and
+  the raw document.
 
 All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
 Reload and Reset, and all of them listen for the `postMessage` that every write
@@ -563,7 +769,7 @@ To reuse one for another game, copy the page and change two things: the iframe
 
 ---
 
-## 10. Backends
+## 11. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -584,7 +790,7 @@ needs to change.
 
 ---
 
-## 11. Reference
+## 12. Reference
 
 ### API
 
@@ -599,11 +805,14 @@ needs to change.
 | `files.ensure(name, text)` | write a default only if absent |
 | `files.remove(name)` | delete it |
 | `files.list()` / `files.names()` | `[{name, size}]` / sorted names |
+| `stores.instance(name)` | a localforage-shaped store: `getItem` / `setItem` / `removeItem` / `clear` / `keys`, all promise-returning |
+| `stores.names()` | names of the stores the document holds, sorted |
+| `stores.entries(name)` | `[{key, tag, value}]`, decoded, for an inspector |
 | `prefs()` | the first PlayerPrefs block, decoded |
 | `getValue(name)` / `setValue(name, value, type)` | read/write one PlayerPrefs entry |
 | `clear()` | drop the save |
 | `on(cb)` / `off(cb)` | subscribe to changes |
-| `stats()` | `{game, key, mount, booted, flushed, savedAt, lastError}` |
+| `stats()` | `{game, key, mount, booted, flushed, fileWrites, storeWrites, savedAt, lastError}` |
 | `boot(FS, mount)` / `flush(FS, mount)` | Unity hooks, called from the patched player |
 
 ### PlayerPrefs binary layout
@@ -637,7 +846,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 12. Known limits
+## 13. Known limits
 
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
@@ -665,6 +874,18 @@ is what makes a re-encode safe to hand back.
   replaces are minified and can change between GameMaker versions. They are
   small and greppable, but a re-export means re-checking them, the same way a
   re-downloaded Unity framework file silently undoes a Unity conversion.
+- **A remote engine script makes the patch inert.** If a Construct export still
+  lists a CDN copy in `engineScripts` ([section 8.2](#82-make-the-engine-local-first-and-check-it)),
+  the game boots the remote runtime and nothing in this document happens. It is
+  the one failure that looks exactly like success, so check it first.
+- **Stores with no entries vanish.** `clear()` on a store removes its block, and
+  a store whose entries were all removed leaves no trace in the document. What
+  is left is the truth about the save, but it does mean the document cannot
+  distinguish "never used" from "emptied".
+- **localforage methods the runtime never uses are absent.** `length`, `key`,
+  `iterate`, `setDriver`, `config`, `driver` and `dropInstance` throw
+  "not implemented" in the shipped runtime already, so the adapter does not
+  provide them either.
 - **The inspector is same-origin only.** The panel reads the backend directly,
   so a cross-origin game frame would need the `postMessage` path only.
 
