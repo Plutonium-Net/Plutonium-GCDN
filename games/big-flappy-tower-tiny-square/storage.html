@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<!-- Pluto Dev 9/16/2026 — Big FLAPPY Tower text-storage inspector -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Big FLAPPY Tower — Storage Inspector</title>
+  <script src="../../js/plustore.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #4db2ff;
+      --accent-muted: #1f6fa8;
+      --bg: #06090c;
+      --panel: #0d1217;
+      --text: #ffffff;
+      --muted: #8fa0ac;
+      --line: rgba(255, 255, 255, 0.08);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      line-height: 1.5;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Game frame ───────────────────────────────────────────────── */
+    .stage { flex: 1 1 auto; min-width: 0; position: relative; }
+
+    .stage iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #000;
+    }
+
+    /* ── Panel ────────────────────────────────────────────────────── */
+    .panel {
+      flex: 0 0 460px;
+      max-width: 48vw;
+      height: 100%;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel__head {
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      flex: 0 0 auto;
+    }
+
+    .panel__title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+
+    .panel__sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-family: "SF Mono", "Fira Code", monospace;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 10px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex: 0 0 auto;
+      transition: background 0.25s;
+    }
+
+    .dot--live { background: #35c46a; }
+    .dot--empty { background: #6b6b6b; }
+
+    .panel__body { flex: 1 1 auto; overflow-y: auto; padding: 14px 18px 24px; }
+
+    .panel__body::-webkit-scrollbar { width: 9px; }
+    .panel__body::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 5px;
+    }
+
+    .section { margin-bottom: 22px; }
+
+    .section__heading {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0.9;
+      margin-bottom: 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .section__heading span { color: var(--muted); opacity: 0.9; letter-spacing: 0; text-transform: none; font-weight: 400; }
+
+    .section__heading .storename {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    /* ── Key table ────────────────────────────────────────────────── */
+    .table-scroll { overflow-x: auto; }
+
+    table { border-collapse: collapse; width: 100%; font-size: 0.78rem; min-width: 300px; }
+
+    th, td {
+      text-align: left;
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    tbody tr { cursor: pointer; }
+    tbody tr:hover td { background: rgba(77, 178, 255, 0.07); }
+    tbody tr.sel td.key { color: var(--accent); }
+
+    td.key {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.72rem;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    td.tag {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.66rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    td.value {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.7rem;
+      color: #8fd6a8;
+      max-width: 210px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    tr.flash td.key { animation: flash 1.1s ease-out; }
+
+    @keyframes flash {
+      0% { background: rgba(77, 178, 255, 0.45); }
+      100% { background: transparent; }
+    }
+
+    .empty { color: #8fa0ac; font-size: 0.75rem; cursor: default; }
+
+    /* ── Decoded value ────────────────────────────────────────────── */
+    pre.peek {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.7rem;
+      line-height: 1.55;
+      color: #cfd3d8;
+      background: #040608;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 10px;
+      max-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Raw document ─────────────────────────────────────────────── */
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      background: #040608;
+      color: #cfd3d8;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.7rem;
+      line-height: 1.5;
+      resize: vertical;
+      white-space: pre;
+      overflow-wrap: normal;
+      overflow-x: auto;
+    }
+
+    textarea:focus { outline: 1px solid var(--accent-muted); }
+
+    .row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+
+    button {
+      background: rgba(77, 178, 255, 0.14);
+      border: 1px solid rgba(77, 178, 255, 0.4);
+      color: #d6ecff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 6px 11px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    button:hover { background: rgba(77, 178, 255, 0.28); border-color: var(--accent); }
+
+    button.ghost {
+      background: rgba(255,255,255,0.04);
+      border-color: var(--line);
+      color: var(--muted);
+    }
+
+    button.ghost:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+
+    .note {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    .note code {
+      font-family: "SF Mono", "Fira Code", monospace;
+      background: rgba(255,255,255,0.06);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--text);
+    }
+
+    .msg { font-size: 0.7rem; margin-top: 8px; min-height: 1em; color: #8fd6a8; }
+    .msg--err { color: #ff9c7a; }
+
+    /* ── Narrow viewports: stack the game above the panel ─────────── */
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+
+      .stage { flex: 0 0 52vh; }
+
+      .panel {
+        flex: 1 1 auto;
+        max-width: none;
+        height: auto;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <iframe id="game" src="./index.html" title="Big FLAPPY Tower"></iframe>
+  </div>
+
+  <aside class="panel">
+    <div class="panel__head">
+      <div class="panel__title">Big FLAPPY Tower — storage</div>
+      <div class="panel__sub" id="key"></div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span id="status">waiting for the game to boot…</span>
+      </div>
+    </div>
+
+    <div class="panel__body">
+      <div id="stores"></div>
+
+      <div class="section">
+        <div class="section__heading">
+          <span id="peek-title">no key selected</span>
+        </div>
+        <pre class="peek" id="peek">Click a key above to read its stored value.</pre>
+      </div>
+
+      <div class="section">
+        <div class="section__heading">
+          Raw document <span id="doc-size"></span>
+        </div>
+        <textarea id="doc" spellcheck="false" placeholder="the whole save is one text document — it appears here as the game writes to it"></textarea>
+        <div class="row">
+          <button id="copy">Copy</button>
+          <button id="export">Export .txt</button>
+          <button id="import">Import into game</button>
+        </div>
+        <div class="row">
+          <button class="ghost" id="reload">Reload game</button>
+          <button class="ghost" id="reset">Reset storage</button>
+        </div>
+        <div class="msg" id="msg"></div>
+        <div class="note">
+          The runtime's own key/value stores (<code>c3-localstorage-…</code>,
+          <code>c3-savegames-…</code>, built with <code>localforage.createInstance</code>)
+          now resolve to <code>PluStore.stores</code>, so nothing reaches IndexedDB —
+          the save is this one document instead.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    (function () {
+      'use strict';
+
+      PluStore.configure({ game: 'big-flappy-tower-tiny-square' });
+
+      /* The two stores this export ever creates. data.json's project unique id
+         is what the runtime appends to both names, so they can be listed
+         before the game has written anything — an empty store and a missing
+         store look identical otherwise. */
+      var EXPECTED = [
+        'c3-localstorage-ldz28jk2uv2f',
+        'c3-savegames-ldz28jk2uv2f'
+      ];
+
+      var el = {
+        game: document.getElementById('game'),
+        dot: document.getElementById('dot'),
+        status: document.getElementById('status'),
+        key: document.getElementById('key'),
+        stores: document.getElementById('stores'),
+        peekTitle: document.getElementById('peek-title'),
+        peek: document.getElementById('peek'),
+        doc: document.getElementById('doc'),
+        docSize: document.getElementById('doc-size'),
+        msg: document.getElementById('msg')
+      };
+
+      var lastValues = {}; // "store\u0000key" -> value, so a change can flash
+      var selected = null; // { store: name, key: key }
+      var editing = false;
+
+      el.key.textContent = PluStore.stats().key;
+
+      function say(text, isError) {
+        el.msg.textContent = text;
+        el.msg.className = 'msg' + (isError ? ' msg--err' : '');
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      function shortTime(iso) {
+        if (!iso) return 'just now';
+        return new Date(iso).toLocaleTimeString();
+      }
+
+      function storeNames() {
+        var seen = {};
+        var out = [];
+        var known = PluStore.stores.names();
+        var i;
+        for (i = 0; i < known.length; i++) { seen[known[i]] = true; out.push(known[i]); }
+        for (i = 0; i < EXPECTED.length; i++) {
+          if (!seen[EXPECTED[i]]) { seen[EXPECTED[i]] = true; out.push(EXPECTED[i]); }
+        }
+        return out;
+      }
+
+      /* A value as the panel shows it in a table cell. */
+      function preview(value, tag) {
+        if (tag === 'u8' || tag === 'ab') {
+          var bytes = value instanceof ArrayBuffer ? new Uint8Array(value) : value;
+          return bytes.length + ' bytes';
+        }
+        if (tag === 'date') return value.toISOString();
+        if (tag === 'json') {
+          var text = JSON.stringify(value);
+          return text.length > 44 ? text.slice(0, 44) + '…' : text;
+        }
+        var s = value === undefined ? 'undefined' : (value === null ? 'null' : String(value));
+        return s.length > 44 ? s.slice(0, 44) + '…' : s;
+      }
+
+      /* The full value, for the peek pane. */
+      function full(value, tag) {
+        if (tag === 'u8' || tag === 'ab') {
+          var bytes = value instanceof ArrayBuffer ? new Uint8Array(value) : value;
+          var hex = [];
+          for (var i = 0; i < Math.min(bytes.length, 64); i++) {
+            hex.push((bytes[i] < 16 ? '0' : '') + bytes[i].toString(16));
+          }
+          return bytes.length + ' bytes\n' + hex.join(' ') + (bytes.length > 64 ? ' …' : '') +
+            '\n(' + (value instanceof ArrayBuffer ? 'ArrayBuffer' : 'Uint8Array') + ')';
+        }
+        if (tag === 'str') return value;
+        if (tag === 'json') return JSON.stringify(value, null, 2);
+        if (tag === 'date') return value.toISOString();
+        if (value === undefined) return 'undefined';
+        return String(value);
+      }
+
+      function render(doc, source) {
+        if (editing) return;
+
+        var used = {};
+        var html = '';
+        var names = storeNames();
+        var changed = 0;
+        var totalKeys = 0;
+
+        for (var s = 0; s < names.length; s++) {
+          var store = names[s];
+          var entries = PluStore.stores.entries(store);
+          var rows = '';
+          totalKeys += entries.length;
+
+          for (var e = 0; e < entries.length; e++) {
+            var id = store + '\u0000' + entries[e].key;
+            var isChanged = lastValues[id] !== undefined && lastValues[id] !== entries[e].text;
+            if (isChanged) changed++;
+            lastValues[id] = entries[e].text;
+            used[id] = true;
+
+            var isSel = selected && selected.store === store && selected.key === entries[e].key;
+            rows += '<tr data-store="' + escapeHtml(store) + '" data-key="' + escapeHtml(entries[e].key) + '"' +
+              (isSel ? ' class="sel"' : (isChanged ? ' class="flash"' : '')) + '>' +
+              '<td class="key">' + escapeHtml(entries[e].key) + '</td>' +
+              '<td class="tag">' + escapeHtml(entries[e].tag) + '</td>' +
+              '<td class="value">' + escapeHtml(preview(entries[e].value, entries[e].tag)) + '</td></tr>';
+          }
+
+          html += '<div class="section">' +
+            '<div class="section__heading">' +
+            '<span class="storename">' + escapeHtml(store) + '</span>' +
+            '<span>' + entries.length + (entries.length === 1 ? ' key' : ' keys') + '</span>' +
+            '</div>';
+          if (!entries.length) {
+            html += '<div class="empty">nothing stored here yet</div>';
+          } else {
+            html += '<div class="table-scroll"><table><thead><tr>' +
+              '<th>Key</th><th>Type</th><th>Value</th></tr></thead><tbody>' + rows +
+              '</tbody></table></div>';
+          }
+          html += '</div>';
+        }
+
+        el.stores.innerHTML = html;
+        el.doc.value = doc || '';
+        el.docSize.textContent = doc ? doc.length + ' chars' : '';
+
+        el.dot.className = 'dot ' + (totalKeys ? 'dot--live' : 'dot--empty');
+        el.status.textContent = totalKeys
+          ? (source === 'live' ? 'live — ' : '') +
+            (changed ? changed + ' value' + (changed === 1 ? '' : 's') + ' changed' : 'save captured') +
+            ', ' + shortTime(PluStore.stats().savedAt)
+          : 'no save yet';
+
+        if (selected && !used[selected.store + '\u0000' + selected.key]) {
+          selected = null;
+          paintPeek();
+        } else if (selected) {
+          paintPeek();
+        }
+      }
+
+      /* ── The decoded view of one key ────────────────────────────── */
+      function paintPeek() {
+        if (!selected) {
+          el.peekTitle.textContent = 'no key selected';
+          el.peek.textContent = 'Click a key above to read its stored value.';
+          return;
+        }
+
+        var entries = PluStore.stores.entries(selected.store);
+        for (var i = 0; i < entries.length; i++) {
+          if (entries[i].key !== selected.key) continue;
+          el.peekTitle.textContent = selected.store + ' · ' + selected.key + ' · ' + entries[i].tag;
+          el.peek.textContent = full(entries[i].value, entries[i].tag);
+          return;
+        }
+
+        el.peekTitle.textContent = selected.key;
+        el.peek.textContent = '(gone)';
+      }
+
+      el.stores.addEventListener('click', function (ev) {
+        var row = ev.target;
+        while (row && row.tagName !== 'TR') row = row.parentNode;
+        if (!row || !row.dataset || !row.dataset.key) return;
+        selected = { store: row.dataset.store, key: row.dataset.key };
+        render(PluStore.get(), 'init');
+      });
+
+      /* Live feed: the game posts on every write. */
+      window.addEventListener('message', function (ev) {
+        if (!ev.data || !ev.data.pluTextStore) return;
+        render(ev.data.doc, 'live');
+      });
+
+      /* Fallback, in case a write happened before this page attached. */
+      setInterval(function () {
+        if (editing) return;
+        var doc = PluStore.get();
+        if (doc !== el.doc.value) render(doc, 'poll');
+      }, 1500);
+
+      el.doc.addEventListener('focus', function () { editing = true; });
+      el.doc.addEventListener('blur', function () { editing = false; });
+
+      document.getElementById('copy').addEventListener('click', function () {
+        var text = el.doc.value;
+        if (!text) return say('nothing to copy', true);
+        navigator.clipboard.writeText(text).then(function () {
+          say('document copied to the clipboard');
+        }, function () {
+          el.doc.select();
+          document.execCommand('copy');
+          say('document copied');
+        });
+      });
+
+      document.getElementById('export').addEventListener('click', function () {
+        if (!el.doc.value) return say('nothing to export', true);
+        var blob = new Blob([el.doc.value], { type: 'text/plain' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'big-flappy-tower-save.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        say('exported big-flappy-tower-save.txt');
+      });
+
+      document.getElementById('import').addEventListener('click', function () {
+        var text = el.doc.value;
+        if (!text.trim()) return say('paste a document first', true);
+        try {
+          PluStore.set(text);
+        } catch (err) {
+          return say('could not import: ' + err.message, true);
+        }
+        editing = false;
+        lastValues = {};
+        say('imported — reloading the game so it reads the new save');
+        reloadGame();
+      });
+
+      document.getElementById('reload').addEventListener('click', function () {
+        say('reloading');
+        reloadGame();
+      });
+
+      document.getElementById('reset').addEventListener('click', function () {
+        PluStore.clear();
+        lastValues = {};
+        selected = null;
+        editing = false;
+        paintPeek();
+        say('storage cleared — reloading the game from scratch');
+        reloadGame();
+      });
+
+      function reloadGame() {
+        /* A cache-busting query keeps the runtime from reusing a booted one. */
+        el.game.src = './index.html?r=' + Date.now();
+      }
+
+      render(PluStore.get(), 'init');
+    })();
+  </script>
+</body>
+</html>
