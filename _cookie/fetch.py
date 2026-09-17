@@ -16,6 +16,7 @@ print('commit', commit)
 
 def git_sha1(data):
     h = hashlib.sha1()
+    h.update(b'blob %d\0' % len(data))
     h.update(data)
     return h.hexdigest()
 
