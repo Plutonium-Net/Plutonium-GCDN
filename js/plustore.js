@@ -588,48 +588,63 @@
   ─────────────────────────────────────────────────────────────────────────── */
 
   function webStorageArea() {
-    var area = {
-      getItem: function (key) {
-        var map = view().files;
-        var k = fileKey(key);
-        return map.hasOwnProperty(k) ? map[k] : null;
-      },
+    var area = {};
 
-      setItem: function (key, value) {
-        var v = view();
-        v.files[fileKey(key)] = value === undefined || value === null ? '' : String(value);
-        stats.fileWrites++;
-        writeView(v);
-      },
+    /* The methods are defined non-enumerable, the way a real Storage has them
+       on its prototype rather than as data: Object.keys(localStorage) on a
+       browser's own area lists the stored keys, and listing five method names
+       instead would be a lie about the contents. What this area does not do is
+       the reverse — expose each key as a property — so `for (var k in
+       localStorage)` sees nothing and localStorage.foo is undefined. Use
+       getItem/setItem and that difference never comes up. */
+    function method(name, fn) {
+      Object.defineProperty(area, name, {
+        value: fn, enumerable: false, configurable: true, writable: true
+      });
+    }
 
-      removeItem: function (key) {
-        var v = view();
-        delete v.files[fileKey(key)];
-        stats.fileWrites++;
-        writeView(v);
-      },
+    method('getItem', function (key) {
+      var map = view().files;
+      var k = fileKey(key);
+      return map.hasOwnProperty(k) ? map[k] : null;
+    });
 
-      /* clear() empties this area, i.e. the @file blocks. A Unity save living
-         in the same document as @unity-prefs blocks is a different area and
-         keeps its own; nothing else in the document is touched. */
-      clear: function () {
-        var v = view();
-        var names = fileNames(v.files);
-        for (var i = 0; i < names.length; i++) delete v.files[names[i]];
-        stats.fileWrites++;
-        writeView(v);
-      },
+    method('setItem', function (key, value) {
+      var v = view();
+      v.files[fileKey(key)] = value === undefined || value === null ? '' : String(value);
+      stats.fileWrites++;
+      writeView(v);
+    });
 
-      key: function (index) {
-        var names = fileNames(view().files);
-        var i = Number(index) | 0;
-        return i >= 0 && i < names.length ? names[i] : null;
-      }
-    };
+    method('removeItem', function (key) {
+      var v = view();
+      delete v.files[fileKey(key)];
+      stats.fileWrites++;
+      writeView(v);
+    });
 
+    /* clear() empties this area, i.e. the @file blocks. A Unity save living in
+       the same document as @unity-prefs blocks is a different area and keeps
+       its own; nothing else in the document is touched. */
+    method('clear', function () {
+      var v = view();
+      var names = fileNames(v.files);
+      for (var i = 0; i < names.length; i++) delete v.files[names[i]];
+      stats.fileWrites++;
+      writeView(v);
+    });
+
+    method('key', function (index) {
+      var names = fileNames(view().files);
+      var i = Number(index) | 0;
+      return i >= 0 && i < names.length ? names[i] : null;
+    });
+
+    /* length is a getter, like a real Storage's: a number copied out once would
+       go stale the moment the game writes another key. */
     Object.defineProperty(area, 'length', {
       get: function () { return fileNames(view().files).length; },
-      enumerable: true
+      enumerable: false, configurable: true
     });
 
     return area;

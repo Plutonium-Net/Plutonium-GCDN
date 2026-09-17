@@ -1,4 +1,4 @@
-﻿/*
+/*
 All this code is copyright Orteil, 2013-2026.
 	-with some help, advice and fixes by Nicholas Laux, Debugbro, Opti, the folks at Playsaurus, and lots of people on reddit, Discord, and the DashNet forums
 	-also includes a bunch of snippets found on stackoverflow.com and others
@@ -4421,21 +4421,17 @@ Game.Launch = function () {
           var local = localStorageGet(Game.SaveTo);
           if (
             !local
-          ) //no localstorage save found? let's get the cookie one last time
+          ) //nothing in the store yet, so there is no save to load
           {
-            if (document.cookie.indexOf(Game.SaveTo) >= 0) {
-              str = unescape(document.cookie.split(Game.SaveTo + "=")[1]);
-              document.cookie =
-                Game.SaveTo + "=;expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-            } else return false;
+            return false;
           } else {
             str = unescape(local);
           }
         } else //legacy system
         {
-          if (document.cookie.indexOf(Game.SaveTo) >= 0)
-            str = unescape(document.cookie.split(Game.SaveTo + "=")[1]); //get cookie here
-          else return false;
+            /* This branch read the save out of a browser cookie. PluStore owns
+               the save now, so the reader went with the store it read. */
+            return false;
         }
       }
       if (str != "") {

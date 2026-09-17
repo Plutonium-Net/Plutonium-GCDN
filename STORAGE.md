@@ -97,7 +97,9 @@ Building that document is the only engine-specific part. For Unity and for
 Godot the engine does it for you (`flush`, see [section 6](#6-unity-webgl) and
 [section 10](#10-godot-4-html5)), and for GameMaker `PluStore.files` does (see
 [section 7](#7-gamemaker-html5)); for a key/value engine `PluStore.stores` does
-(see [section 8](#8-construct-3-html5)); for anything else you serialise the
+(see [section 8](#8-construct-3-html5)); for an engine whose whole save is
+`localStorage`, `PluStore.installWebStorage()` does (see
+[section 11](#11-web-storage-localstorage)); for anything else you serialise the
 engine's own storage into the format in [section 4](#4-document-format).
 
 ### 3.4 Restore the save
@@ -126,7 +128,7 @@ exists today:
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
-| Anything else using `localStorage` | call `getValue` / `setValue` in place of `localStorage.getItem` / `setItem` | pattern, not implemented |
+| Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
 returns a document, one that takes a document and rebuilds the engine's save.
@@ -196,8 +198,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — nine games are on PluStore so
-   far, and 25 in this repo still load that bridge.
+   `<script src="../../js/sync.js"></script>` — eleven games are on PluStore
+   so far, and 23 in this repo still load that bridge.
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -210,7 +212,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 11](#11-verifying-a-conversion).
+   count in [section 12](#12-verifying-a-conversion).
 
 ---
 
@@ -826,7 +828,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 11](#11-verifying-a-conversion)).
+what the game asks for ([section 12](#12-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -1309,10 +1311,135 @@ options save, which decodes as `4344 bytes` starting `f4 10 00 00 …` with
 
 ---
 
-## 11. Verifying a conversion
+## 11. Web Storage (`localStorage`)
+
+Some engines never touch a filesystem or a database. They keep their whole save
+in `localStorage` — one key per save slot, one for a setting, a `clear()` that
+wipes them — and Cookie Clicker is exactly that shape: `CookieClickerGame`,
+`CookieClickerGameBeta`, `CookieClickerLang`, and `localStorage.clear()` when
+the player asks to reset. A very large number of browser games look like this.
+
+There is no engine file to patch here, because the browser *is* the engine. So
+the storage area itself is replaced, before the game loads:
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>
+  PluStore.configure({ game: 'my-game' });
+
+  /* window.localStorage is now a Storage-shaped area over the document. */
+  var storage = PluStore.installWebStorage();
+  if (!storage) console.error('the save would not be ours');
+</script>
+<script src="main.js"></script>
+```
+
+`installWebStorage()` returns the area it installed — `getItem`, `setItem`,
+`removeItem`, `clear`, `key`, `length` — or `null` if the browser refused the
+swap, which is the one outcome a page must not ignore: a game that keeps writing
+to the real `localStorage` looks like it saved while the document stays empty.
+`PluStore.webStorage()` hands back the same object without installing it.
+
+The area's keys ride in the same document as `@file` blocks, one block per key,
+so the save is readable text in the inspector like every other conversion. The
+methods are defined non-enumerable, the way a real Storage has them on its
+prototype, so `Object.keys(localStorage)` inside the game lists nothing rather
+than five method names.
+
+### 11.1 Repair the area, not the call sites
+
+Cookie Clicker touches `localStorage` in twenty places: five calls through its
+own `localStorageGet`/`localStorageSet` helpers, and direct
+`window.localStorage.getItem` / `.setItem` / `.clear` calls elsewhere. Both work
+after the swap, and that is the argument for doing it this way. Editing the game
+means twenty edits in 1.2 MB of vendored code that a future version re-imports
+over, and any call site the edit misses keeps writing to the browser's store
+where nothing will read it. One swap covers all of them, including the ones that
+do not exist yet.
+
+### 11.2 The trap: the document lives in `localStorage` too
+
+The document itself is stored under `plu:text:<game>`, so a backend that resolves
+`global.localStorage` when it is *called* will, the moment the shim is installed,
+read and write through the shim — the document asking the shim for the document.
+That is not merely slow, it is unbounded: every access recursed until the stack
+ran out, the backend's own `try/catch` swallowed the resulting `RangeError` and
+answered "no document", and the page ended up with the main thread pinned while
+the game booted against an empty save.
+
+PluStore now captures the browser's Storage once, at load, before any page script
+can replace it, and the backend reads that capture rather than the global. The
+order of a page's own scripts therefore cannot move where the document lives, and
+a game that swaps its own storage cannot take the document with it.
+
+### 11.3 What the game keeps, and where
+
+| Key | What it holds |
+|---|---|
+| `CookieClickerGame` | the save: `escape(base64(<pipe string>) + "!END!")` — 3.9 KB at the start of a run, and it grows |
+| `CookieClickerGameBeta` | the same key for the beta version; `Game.beta` is 0 in this build, so it stays empty |
+| `CookieClickerLang` | the language code the game last loaded (`EN`), which is why a fresh save shows the language picker |
+
+The save is base64, so a reader cannot tell progress from the document alone —
+that is what the inspector's decode is for, and it is why the inspector also
+reads the live game's own numbers out of the frame instead of re-deriving them.
+
+### 11.4 The paths that had to go
+
+- **The page's own switch.** Cookie Clicker decides everything remote from
+  `LOCAL`, and in the original that flag is *derived*:
+  `(App || !hostname || hostname === 'localhost' || hostname === '127.0.0.1')`.
+  On the original host it is false, and false means CDN assets, an ad loader, the
+  Facebook pixel, the update check and a herald fetch. Pinning `var LOCAL=true`
+  is what makes the folder self-contained on any host, not just on a dev box
+  where the derivation happened to agree with us.
+- **The ads.** The Google ad loader, the adblock-detector stub, the ad slots and
+  the Playsaurus backfill frames are gone. The little `if (LOCAL)` object that
+  stubs `adsbygoogle` stays, because the game's layout code calls it, and the
+  game's own `noAds` class — which it applies when `LOCAL` is true — is what lays
+  the page out without the ad column.
+- **The fonts.** The original page's `@font-face` rules point at the host's
+  `/cf-fonts/` URLs and the Google Fonts link is commented out in the original;
+  both are gone and the page falls back to its own stack.
+- **The cookie store.** `document.cookie` is the game's *older* save method, and
+  the code is still in the file: `WriteSave`'s "legacy system" branch writes the
+  save into a cookie. It is dead code in this build, because
+  `Game.useLocalStorage = 1` is hard-coded and never reassigned, so the
+  localStorage branch always wins. The one *reachable* cookie path — the fallback
+  `LoadSave` takes when the store holds no save — is cut, so a save can only ever
+  come from the document. A fresh copy of the file from the mirror puts that
+  reader back, the same way a re-downloaded Unity framework undoes a Unity
+  conversion.
+
+### 11.5 Verifying a Web Storage conversion
+
+1. **The document appears, one block per key.** Click the cookie, let the game
+   save, and `localStorage.getItem('plu:text:<game>')` holds `@file` blocks named
+   after the game's own keys.
+2. **The game's own store holds nothing else.** Inside the game page,
+   `Object.keys(localStorage)` is `[]` (the shim's methods are non-enumerable) and
+   `localStorage.getItem('<the game's key>')` returns the save — through the
+   shim, which is the point.
+3. **A value round-trips through the game, not around it.** Write a value the
+   game will display — Cookie Clicker's `Game.bakeryName` — save with the game's
+   own `Game.WriteSave()`, reload, and read it back in the game's own UI. The
+   stronger version is playing the value into existence: the cookie count is on
+   screen, so its survival across a reload is visible without asking the console
+   anything.
+4. **The control.** Clear the document and boot. The game must come back with
+   fresh defaults (a new random bakery name and zero cookies), which is what
+   proves the earlier values came from the document rather than from a cache.
+5. **Nothing else is reachable.** `indexedDB.databases()` is empty and the page's
+   network log is all loopback — for Cookie Clicker every request is an image,
+   a script, a sound or `loc/EN.js` under the game folder.
+
+## 12. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
-failure mode that looks like success.
+failure mode that looks like success. The engine-specific half of each step is
+where the work is: [section 11.5](#115-verifying-a-web-storage-conversion) for a
+`localStorage` engine, [section 10.5](#105-verifying-a-godot-conversion) for a
+Godot export, and the notes at the end of sections 6–9 for the rest.
 
 1. **The document appears.** `localStorage` holds one key, and it is readable
    text: `localStorage.getItem('plu:text:<game>')`.
@@ -1419,7 +1546,7 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 12. Inspecting a save
+## 13. Inspecting a save
 
 Every converted game has one, and they take the shape the engine needs:
 
@@ -1440,6 +1567,10 @@ game whose two store names collide with Big FLAPPY Tower's.
 - `games/buckshot-roulette/storage.html` — the file tree for a Godot build: the
   mounted `user://` tree, the selected file decoded (text inline, binary as a
   byte count and a hex head), and the raw document.
+- `games/cookie-clicker/storage.html` — the storage-key table for a
+  `localStorage` engine, the selected key decoded with the game's own
+  `base64.js` into its pipe-separated fields, the live game's cookies/bakery read
+  out of the frame, and the raw document.
 
 All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
 Reload and Reset, and all of them listen for the `postMessage` that every write
@@ -1450,7 +1581,7 @@ To reuse one for another game, copy the page and change two things: the iframe
 
 ---
 
-## 13. Backends
+## 14. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -1471,7 +1602,7 @@ needs to change.
 
 ---
 
-## 14. Reference
+## 15. Reference
 
 ### API
 
@@ -1528,7 +1659,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 15. Known limits
+## 16. Known limits
 
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
@@ -1592,6 +1723,18 @@ is what makes a re-encode safe to hand back.
   `iterate`, `setDriver`, `config`, `driver` and `dropInstance` throw
   "not implemented" in the shipped runtime already, so the adapter does not
   provide them either.
+- **A Web Storage area implements the methods, not the property access.** The
+  area installed by `installWebStorage()` answers `getItem`, `setItem`,
+  `removeItem`, `clear`, `key` and `length`, which is all Cookie Clicker uses. It
+  does not mirror each key as a property, so `localStorage.foo` is `undefined`
+  and `for (var k in localStorage)` sees nothing where a real area would list its
+  keys. A game that enumerates its own storage that way needs that added first —
+  silently mis-enumerating a save is worse than not supporting it.
+- **Cookie Clicker still carries its cookie store in the source.**
+  `WriteSave`'s "legacy system" branch assigns `document.cookie`, live in the file
+  and unreachable in this build (`Game.useLocalStorage = 1`, never reassigned).
+  Both of its readers are gone, so nothing can load from it, but a reader will
+  find the code and should know why it is there.
 - **The inspector is same-origin only.** The panel reads the backend directly,
   so a cross-origin game frame would need the `postMessage` path only.
 
