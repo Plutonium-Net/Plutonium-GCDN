@@ -580,11 +580,15 @@
      inside a 1.2 MB game file, the area itself is swapped out before the
      game loads. Every key becomes an @file block, still text.
 
-     The four methods are the whole of what a Storage area offers a game
-     that saves this way, plus key()/length for the ones that enumerate.
-     Names are sorted so the same save always serialises to the same bytes,
-     and `length` is a getter rather than a number, because a copy of a count
-     goes stale the moment the game writes.
+     Two ways into an area, and a game may use either one. The four methods
+     are what a game that saves by their name asks for, plus key()/length for
+     the ones that enumerate; the property surface is the other half, because
+     a browser's own area exposes every stored key as an own enumerable
+     property and some games only ever write that way. Both are live views of
+     the same @file blocks, so the two cannot drift apart. Names are sorted so
+     the same save always serialises to the same bytes, and `length` is a
+     getter rather than a number, because a copy of a count goes stale the
+     moment the game writes.
   ─────────────────────────────────────────────────────────────────────────── */
 
   function webStorageArea() {
@@ -593,10 +597,9 @@
     /* The methods are defined non-enumerable, the way a real Storage has them
        on its prototype rather than as data: Object.keys(localStorage) on a
        browser's own area lists the stored keys, and listing five method names
-       instead would be a lie about the contents. What this area does not do is
-       the reverse — expose each key as a property — so `for (var k in
-       localStorage)` sees nothing and localStorage.foo is undefined. Use
-       getItem/setItem and that difference never comes up. */
+       instead would be a lie about the contents. What a plain object cannot do
+       is the reverse — expose a key nobody declared — which is why the object
+       is returned wrapped in a Proxy at the bottom of this function. */
     function method(name, fn) {
       Object.defineProperty(area, name, {
         value: fn, enumerable: false, configurable: true, writable: true
@@ -647,7 +650,81 @@
       enumerable: false, configurable: true
     });
 
-    return area;
+    /* Property access: the second way into an area, and the reason a plain
+       object is not enough. Core Ball's whole save helper is two lines —
+       `window.localStorage[k] = v` and `window.localStorage[k]` — with no
+       getItem or setItem anywhere in the game. Against an area that only
+       answers by method, every read is undefined (the game restarts at level
+       1 forever) and every write lands on a property that nothing serialises
+       (the save looks like it worked and is gone). Both failures are silent,
+       which is what makes them worth this much code.
+
+       A Proxy is what makes an undeclared key reachable: read, write, `in`,
+       delete and Object.keys each have to speak for a key the object has
+       never heard of. Four of those behaviours are the browser's rather than
+       a plain object's, and each is a thing a game can notice:
+
+         * a key that is not stored reads undefined, the way a missing
+           property does — getItem() is the one that answers null
+         * a method or `length` wins over a key of the same name, because
+           `prop in area` is true for those on a real Storage too
+         * assigning stores the string, so `localStorage.n = 3` reads back
+           "3" exactly as the browser does
+         * Object.keys() lists the stored keys and not the five methods
+
+       A browser without Proxy gets the bare method surface. Degrading beats
+       throwing: an area that raises where the game used to work would take
+       the page down with it. */
+    if (typeof Proxy !== 'function') return area;
+
+    return new Proxy(area, {
+      get: function (target, prop) {
+        if (typeof prop === 'symbol' || prop in target) return target[prop];
+        var map = view().files;
+        var k = fileKey(prop);
+        return hasKey(map, k) ? map[k] : undefined;
+      },
+
+      set: function (target, prop, value) {
+        if (typeof prop === 'symbol' || prop in target) { target[prop] = value; return true; }
+        area.setItem(prop, value);
+        return true;
+      },
+
+      has: function (target, prop) {
+        return prop in target || hasKey(view().files, fileKey(prop));
+      },
+
+      deleteProperty: function (target, prop) {
+        if (prop in target) { delete target[prop]; return true; }
+        area.removeItem(prop);
+        return true;
+      },
+
+      ownKeys: function (target) {
+        /* The target's own names are the five methods and length, all
+           non-enumerable, so Object.keys() filters them out on the
+           descriptor it asks for below. */
+        var out = Object.getOwnPropertyNames(target);
+        var names = fileNames(view().files);
+        for (var i = 0; i < names.length; i++) {
+          if (out.indexOf(names[i]) < 0) out.push(names[i]);
+        }
+        return out;
+      },
+
+      getOwnPropertyDescriptor: function (target, prop) {
+        var d = Object.getOwnPropertyDescriptor(target, prop);
+        if (d) return d;
+        if (typeof prop === 'symbol') return undefined;
+        var map = view().files;
+        var k = fileKey(prop);
+        if (!hasKey(map, k)) return undefined;
+        /* Configurable, because the target does not own this property: a
+           proxy may not report an undeclared key as non-configurable. */
+        return { value: map[k], writable: true, enumerable: true, configurable: true };
+      }
+    });
   }
 
   /* The name a host hands over may carry its own storage prefix. Strip it once
@@ -664,6 +741,10 @@
     var names = [];
     for (var name in map) if (map.hasOwnProperty(name)) names.push(name);
     return names.sort();
+  }
+
+  function hasKey(map, name) {
+    return Object.prototype.hasOwnProperty.call(map, name);
   }
 
   /* The document as the hosted views see it: @file blocks as a name -> text

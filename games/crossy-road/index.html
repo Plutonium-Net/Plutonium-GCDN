@@ -1,35 +1,44 @@
 <!DOCTYPE html>
 
-
 <!-- Pluto Game 9/11/2026 -->
-
 
 <html lang="en">
 <head>
-<script src="../../js/sync.js"></script>
-  <base href="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@latest/crossy-road/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Crossy Road</title>
 
-  <script src="https://cdn.jsdelivr.net/gh/bubbls/youtube-playables@main/ytgame.js" nonce="2KHli9LrFFijH2jCb5SkMw"></script>
+  <!-- The save. PluStore keeps it, ytgame-local is the game's own storage API
+       pointed at it, and the engine below loads after both so the first save
+       the game makes has somewhere to go. -->
+  <script src="../../js/plustore.js"></script>
+  <script>PluStore.configure({ game: 'crossy-road' });</script>
+  <script src="ytgame-local.js"></script>
 
-  <link rel="stylesheet" href="style.css" nonce="2KHli9LrFFijH2jCb5SkMw">
+  <!-- This page used to be a wrapper: <base> pointed every relative path at a
+       jsDelivr folder, the Playables SDK came from that CDN with it, and
+       js/sync.js carried the save off to a server. Nothing here leaves the
+       machine now, and the SDK is not loaded at all — ytgame-local says why. -->
+  <link rel="stylesheet" href="style.css">
 
-  <script src="scripts/three.min.js" nonce="2KHli9LrFFijH2jCb5SkMw"></script>
-
-  <script src="scripts/game.min.js" nonce="2KHli9LrFFijH2jCb5SkMw"></script>
-
-  <script src="scripts/extra.min.js" nonce="2KHli9LrFFijH2jCb5SkMw"></script>
-  <script src="scripts/bootstrap.min.js" nonce="2KHli9LrFFijH2jCb5SkMw"></script>
-  
+  <!-- The loader queues these itself (three.min.js in its preroll phase,
+       game.min.js once the loading screen is up) and only calls window.start()
+       from that queue's completion, so a copy here would be a second evaluation
+       of the same file. For game.min.js that second copy dies on the duplicate
+       declaration of its own `let isYouTubeAudioEnabled` — a SyntaxError on every
+       load. The wrapper page kept these in <head> because YouTube's CSP would
+       have blocked the loader's own injected tags without a nonce; there is no
+       CSP here, and the loader's own ordering is the one the game was written
+       against. -->
+  <script src="scripts/three.min.js"></script>
+  <script src="scripts/extra.min.js"></script>
+  <script src="scripts/bootstrap.min.js"></script>
 </head>
 
 <body>
   <canvas id="canvas"></canvas>
-  <div id="build-number"></div>  
-
-  
+  <div id="build-number"></div>
 </body>
+
 </html>

@@ -99,7 +99,9 @@ Godot the engine does it for you (`flush`, see [section 6](#6-unity-webgl) and
 [section 7](#7-gamemaker-html5)); for a key/value engine `PluStore.stores` does
 (see [section 8](#8-construct-3-html5)); for an engine whose whole save is
 `localStorage`, `PluStore.installWebStorage()` does (see
-[section 11](#11-web-storage-localstorage)); for anything else you serialise the
+[section 11](#11-web-storage-localstorage)); for a game that saves through a host
+platform's SDK, a local stand-in for that SDK does (see
+[section 12](#12-youtube-playables-ytgame)); for anything else you serialise the
 engine's own storage into the format in [section 4](#4-document-format).
 
 ### 3.4 Restore the save
@@ -129,10 +131,19 @@ exists today:
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
+| Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
+| YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
 returns a document, one that takes a document and rebuilds the engine's save.
 Put them next to the engine hooks in `js/plustore.js`.
+
+The one exception is the Playables stand-in, which lives in the game's folder
+rather than in the library: it is not an adapter over an engine's storage but a
+replacement for a *platform*, and it defines exactly the members the build in
+front of it calls. Copy [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js)
+for another Playables game and add whatever it reaches for
+([section 12.2](#122-the-local-stand-in)).
 
 ---
 
@@ -198,8 +209,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — eleven games are on PluStore
-   so far, and 23 in this repo still load that bridge.
+   `<script src="../../js/sync.js"></script>` — thirteen games are on PluStore
+   so far, and 21 in this repo still load that bridge.
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -212,7 +223,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 12](#12-verifying-a-conversion).
+   count in [section 13](#13-verifying-a-conversion).
 
 ---
 
@@ -828,7 +839,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 12](#12-verifying-a-conversion)).
+what the game asks for ([section 13](#13-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -1252,6 +1263,25 @@ That file is the round trip. The language chosen in OPTIONS (`Español`) came
 back on the next boot — `EMPEZAR / OPCIONES / CRÉDITOS / SALIR` — from a save the
 game could only have read out of the document.
 
+The second worked example, Crazy Cattle 3D, keeps a **text** save instead —
+`user://crazysavefile.tres`, a Godot resource with `saveunlockedlevels`,
+`savename`, `beatlevels`, `round`, `win`, the two volume floats and `fullscreen`
+in plain sight — and it is the easier one to check, because the game prints what
+it read:
+
+```
+Loaded with name SilentEagle_16c424c8 and 1 unlocked levels   ← the game's own fresh save
+Loaded with name PluStore Test Cow and 9 unlocked levels      ← the next boot, after the document was edited
+```
+
+Those two lines are the whole round trip in the engine's own words, and the name
+is generated, so it cannot have come from anywhere but the save. Two details are
+worth expecting. A **fresh install logs an error** — `Cannot open file
+'user://crazysavefile.tres'`, then `Savefile not found; Initialising` — and that
+is the game's own first-run path, not a broken mount. And this engine writes when
+the *game* decides to: the Options screen here has a **Save** button, which is
+the cheapest way to make the document move on demand.
+
 ### 10.5 Verifying a Godot conversion
 
 The FS and the engine's sync entry are both closure-local, so the page cannot
@@ -1309,6 +1339,68 @@ Reload / Reset row every other panel has. It was verified against the game's rea
 options save, which decodes as `4344 bytes` starting `f4 10 00 00 …` with
 `setting_volume` legible in it.
 
+`games/crazy-cattle-3d/storage.html` is the same panel for the second Godot game,
+with two differences. It lists `@dir` blocks as a count instead of as rows,
+because a first run drops thirty shader-cache directories into the document and a
+list of hashes is not a save anyone reads. And it decodes a `.tres` into the
+`name = value` fields the game itself wrote, which is the whole of what a text
+resource needs.
+
+### 10.7 Localising a split export
+
+Some of these exports were published as *parts* — `index.pck.part1..3`,
+`index.wasm.part1..3` — with the page stitching them back together at load time.
+Crazy Cattle 3D did exactly that, and its folder is over jsDelivr's package
+limit, so **every** file in it, parts included, answers `403 Package size
+exceeded the configured limit of 50 MB`: 128 bytes of apology where a 19 MB chunk
+should be. The game could not load at all, and the page's own error path is what
+said so.
+
+The parts split on a fixed boundary (19,922,944 bytes — exactly 19 MB) rather than
+by anything the engine knows about, so joining them is a concatenation. The check
+is in the page the export ships:
+
+```js
+"fileSizes": { "index.pck": 42336176, "index.wasm": 43699190 }
+```
+
+Concatenate in order, compare the totals against those two numbers, and the
+result is a stock Godot export: `index.pck` and `index.wasm` beside `index.html`,
+which is what the engine asks for — `executable: "index"` makes it ask for
+`<executable>.pck` and `<executable>.wasm`, and `locate_file` maps the audio
+worklets to `<executable>.audio*.worklet.js`, so the two `index.audio*.worklet.js`
+files in that folder are named for the executable and not for `godot`.
+
+Nothing about the storage patch changes for a split export: it is
+[section 10.3](#103-cut-the-indexeddb-persistence) exactly as it stands.
+
+Keeping the split and pointing the merge at local paths would also have worked.
+Joining once is better, because the shim it replaces intercepted `fetch` and
+answered `index.pck` and `index.wasm` with a `setInterval` that polled for the
+merged buffer **and could not fail**. A part that never arrived left every request
+for that file waiting forever, with the loading bar frozen — a conversion that
+hangs instead of reporting. A file asked for by name, which is either there or a
+404, cannot do that.
+
+### 10.8 An endpoint inside the engine
+
+Crazy Cattle 3D POSTs every run to `crazycattle3d.io/api/highscores` and asks the
+same host for updates, from inside the compiled engine: the URL is in
+`index.wasm` and nothing in the page mentions it. There is no file to edit, so it
+is refused at the page level, before `index.js` loads, the way the Cluster Rush
+player is refused its telemetry ([section 6.6](#66-the-asmjs-era-layout)):
+
+```js
+var BLOCK = /(^|\.)crazycattle3d\.io$/;
+```
+
+with the usual three doors covered — `XMLHttpRequest`, `fetch` and
+`navigator.sendBeacon` — so a local build neither reports the player off-machine
+nor waits on a request that cannot succeed. The tell was in the game's own UI: the
+Options screen prints **"Update fail!"** where a reachable host would print a
+result. A refused request looks like any other failed request to the engine,
+which is what an offline player saw anyway.
+
 ---
 
 ## 11. Web Storage (`localStorage`)
@@ -1340,11 +1432,16 @@ swap, which is the one outcome a page must not ignore: a game that keeps writing
 to the real `localStorage` looks like it saved while the document stays empty.
 `PluStore.webStorage()` hands back the same object without installing it.
 
+That area answers by *method*, and it also answers by *property* —
+`localStorage['foo'] = 1` stores exactly what `setItem('foo', 1)` stores, and
+reading it back is the same read. Both are real ways to use a Storage area and
+some games only ever use the second ([section 11.6](#116-the-second-surface-localstoragekey)).
+
 The area's keys ride in the same document as `@file` blocks, one block per key,
 so the save is readable text in the inspector like every other conversion. The
 methods are defined non-enumerable, the way a real Storage has them on its
-prototype, so `Object.keys(localStorage)` inside the game lists nothing rather
-than five method names.
+prototype, so `Object.keys(localStorage)` inside the game lists the game's own
+keys and not the five method names.
 
 ### 11.1 Repair the area, not the call sites
 
@@ -1383,6 +1480,19 @@ a game that swaps its own storage cannot take the document with it.
 The save is base64, so a reader cannot tell progress from the document alone —
 that is what the inspector's decode is for, and it is why the inspector also
 reads the live game's own numbers out of the frame instead of re-deriving them.
+
+**Core Ball**, the other Web Storage engine here, keeps exactly one key:
+
+| Key | What it holds |
+|---|---|
+| `core-ball-level` | the level the game gives itself at boot, as digits — `"4"` |
+
+One key and no enumeration is a property of this *game*, not of the area, and it
+is worth stating because it is what makes the game look like it saves nothing:
+its whole save helper is `window.localStorage[k] = v` and
+`window.localStorage[k]`, two lines with no `getItem` or `setItem` anywhere, and
+it writes on only two occasions — when a level is passed (storing the next one)
+and when **RESET** is pressed (storing `1`).
 
 ### 11.4 The paths that had to go
 
@@ -1432,14 +1542,232 @@ reads the live game's own numbers out of the frame instead of re-deriving them.
 5. **Nothing else is reachable.** `indexedDB.databases()` is empty and the page's
    network log is all loopback — for Cookie Clicker every request is an image,
    a script, a sound or `loc/EN.js` under the game folder.
+6. **A game that saves by property needs the property test**, because every step
+   above passes without it. Inside the game page, `localStorage['<key>']` must
+   return the value rather than `undefined`, `Object.keys(localStorage)` must
+   list the game's keys, and the *game* must move the document. Core Ball's
+   RESET button is the cheapest exercise, because it stores `1`: put `9` in the
+   document, boot, press RESET, and a document that read `9` must read `1` — a
+   change the game made, to a value it cannot have conjured.
 
-## 12. Verifying a conversion
+### 11.6 The second surface: `localStorage[key]`
+
+A Web Storage area is reachable two ways and a game picks one. `getItem` and
+`setItem` are one. The other is the one the browser's own area also offers: every
+stored key is an **own enumerable property**, so `localStorage.foo = 1` and then
+`localStorage.foo` is a complete save and load.
+
+Core Ball uses nothing else. Its whole save helper is:
+
+```js
+setValue: function (k, v) { window['localStorage'] && (window['localStorage'][k] = v); },
+getValue: function (k) { return window['localStorage'] ? window['localStorage'][k] : undefined; }
+```
+
+Against an area that only answered by method, that helper fails **twice and
+silently**: every read is `undefined`, so the game restarts at level 1 forever,
+and every write lands on a property nothing serialises, so the save looks like it
+worked and is gone. Neither raises anything, which is the argument for the shape
+of the fix — a key nobody declared cannot be intercepted by a plain object, so
+the area is a `Proxy`. Read, write, `in`, `delete` and `Object.keys` all have to
+speak for keys the object has never heard of.
+
+Four of those behaviours are the browser's rather than a plain object's, and each
+is something a game can notice:
+
+| Behaviour | Why |
+|---|---|
+| a key that is not stored reads `undefined` | that is what a missing property is; `getItem` is the one that answers `null` |
+| a method or `length` wins over a key of the same name | `prop in area` is true for those on a real Storage too, so a key called `key` is shadowed there as well |
+| assigning stores the *string* | `localStorage.n = 3` reads back `"3"`, exactly as the browser does |
+| `Object.keys()` lists the stored keys and not the methods | the methods are non-enumerable, as they are on the real prototype |
+
+A browser without `Proxy` gets the bare method surface. Degrading beats throwing:
+an area that raised where the game used to work would take the page down with it.
+
+Both surfaces are views of the same `@file` blocks, so they cannot drift — a key
+written through one is readable through the other, in the same tick and in the
+document.
+
+## 12. YouTube Playables (`ytgame`)
+
+Some games do not own their storage at all. They are built for a host platform and
+save through the host's SDK: Crossy Road's save *is* `ytgame.game.saveData(...)`,
+and its load is a scatter of `getYTCloudItem(key, default)` calls that parse that
+blob back. The SDK is the engine, and it is the hardest case in this document,
+because **it cannot be loaded at all** outside YouTube.
+
+### 12.1 What the SDK does when there is no host
+
+Nothing here is PluStore's doing; it is what the vendored SDK does, read out of
+the published `ytgame.js`:
+
+- `IN_PLAYABLES_ENV` is `window !== window.parent`. Not a capability check, not a
+  handshake — *being in a frame at all*. A top-level tab is "not Playables"; any
+  frame, the storage inspector included, is.
+- Every data method is gated on it. Top-level, `loadData()` resolves `""` and
+  `saveData()` does nothing, so a game's save goes in the bin with no error
+  anywhere. Framed, the same calls post a message to a parent that is not there
+  and wait for an answer that never comes, so the game hangs on the load instead.
+- Having decided it is embedded, it redefines `window.localStorage`,
+  `sessionStorage`, `indexedDB`, `caches` and `document.cookie` as **null**, to
+  force games onto its own API. A game that keeps a local fallback for the
+  not-embedded case loses that fallback too.
+
+So loading it is wrong both ways, and not loading it is worse: `saveGameData()`
+calls `ytgame.game.saveData(...)` with no guard, so the first save throws. Write a
+local stand-in.
+
+### 12.2 The local stand-in
+
+[`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) is the
+whole of it — the same object shape, backed by PluStore, loaded before the game:
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>PluStore.configure({ game: 'crossy-road' });</script>
+<script src="ytgame-local.js"></script>
+```
+
+Two decisions in it are worth copying rather than rediscovering:
+
+- **`IN_PLAYABLES_ENV: true`.** The game carries both paths — the SDK one and a
+  local `crossyStorage` one — and only one can be live, because they do not share
+  a namespace: `saveGameData()` always writes the SDK's single JSON blob, while the
+  local getters read thirteen separate keys. Take the SDK path and the local one
+  becomes dead code (39 `crossyStorage` calls, every one of them in the `else`
+  branch of an `if (ytgame?.IN_PLAYABLES_ENV)`); take the other and the game reads
+  a store it never writes.
+- **The blob is one `@file` block.** `loadData`/`saveData` *are* the save read and
+  the save write, so they go through the Web Storage area
+  ([section 11](#11-web-storage-localstorage)) under one key, `ytgameGameData`:
+  one document, one mechanism, one inspectable save — and if a future build does
+  reach the game's own local fallback, that lands in the same document instead of
+  in the browser's store.
+
+Only the members this build touches are defined — `game.loadData`,
+`game.saveData`, `game.gameReady`, `game.firstFrameReady`,
+`system.isAudioEnabled`, `system.onAudioEnabledChange`, `engagement.sendScore`.
+A game that reaches for more should extend that list rather than load the SDK.
+Two of the seven have a shape worth noting: `system.isAudioEnabled()` is
+**synchronous and boolean** (the game assigns it straight into a flag, and the
+SDK's own answer with no host is `true`), and `engagement.sendScore()` resolves,
+saying once in the console that scores stay local, because the leaderboard is
+YouTube's and there is nowhere to send them.
+
+### 12.3 The trap: the game's own load path may be dead code
+
+This is the part that very nearly passed as a working conversion. The saves
+appeared, the document filled in, the console was quiet — and the game still
+started every session at zero progress, because nothing ever read the blob back:
+
+```js
+window.start = function() {
+	//window.StartInitLoader.add(loadYTCloudGameData);    ← the only reference left
+```
+
+That commented line is the game's own bulk load, and every other mention of
+`loadYTCloudGameData` in the file is commented out too. So `Game.topScore`,
+`Game.coins`, `Game.unlockedCharacters` and the other ten fields were never
+seeded, they sat at their JS defaults, and each of the game's five
+`saveGameData()` call sites wrote those defaults back over the save — a high score
+erased by the next boot, and `doUnmute`'s save erasing everything except the two
+fields it passed in. Uncommenting that one line fixes all of it.
+
+**A conversion is not done when the save appears. It is done when a value
+survives a reload.** Through the document, a store the game writes but never
+reads looks exactly like a working one.
+
+### 12.4 Removing the old method
+
+- the `<base href>` pointing at the CDN folder, which went on redirecting every
+  relative path in the page;
+- the SDK's `<script>` from that CDN, and the file itself — deleted from the
+  folder, not just unlinked, so it cannot be re-imported by habit;
+- `js/sync.js`;
+- the game's own non-Playables branches, left in place but unreachable
+  ([section 12.2](#122-the-local-stand-in)). They cost nothing dead; cutting them
+  would be 39 edits into 1.2 MB of vendored minified code.
+
+### 12.5 Two more things this build shipped with
+
+Both are worth knowing before you trust a console on any of these games:
+
+- **`game.min.js` was in the page twice.** The wrapper's `<head>` loaded it, and
+  the game's own loader queues it as an asset once its loading screen is up
+  (`AssetLoader.add.script('scripts/game.min.js')` in `bootstrap.min.js`). The
+  second evaluation died on `let isYouTubeAudioEnabled has already been
+  declared` — a `SyntaxError` on every single load, harmless only because the
+  first copy was already live and holding the game's functions. The head copy is
+  the redundant one: the loader only calls `window.start()` from its queue's
+  completion, so the game script is guaranteed to be evaluated before anything
+  uses it. It existed because YouTube's CSP would have blocked the loader's own
+  injected tags without a nonce; there is no CSP to satisfy locally.
+- **The audio path assumed a manager that did not exist yet.** `Game.audioManager`
+  is built when the logo animation finishes, while the audio check runs 800 ms
+  after startup, so roughly every other load reached `doUnmute()` with it still
+  null, threw a `TypeError`, and took the rest of the function — including its
+  save — with it. Which of the two outcomes you got was a race, which is how the
+  *save* came to be wiped on some boots and not others. Both call sites are
+  guarded now, which is what the author's own commented-out `if` above one of them
+  intended.
+
+### 12.6 What the game then does
+
+- **Reads** one `loadData()` per `getYTCloudItem()`, which is 13 at boot from the
+  bulk loader plus one for the coin HUD through `GameSave.GetCoins()`. Fourteen
+  reads, then the first write.
+- **Writes** `saveData()` with the game's whole thirteen-field object: on a new
+  high score, on the tutorial and carousel flags, on a gumball prize, on a coins
+  change, on a sound toggle. Each write **replaces** the block, which is only safe
+  because `saveGameData()` always serialises all thirteen fields from `Game.*` —
+  and therefore only safe while [section 12.3](#123-the-trap-the-games-own-load-path-may-be-dead-code)
+  holds. A host SDK's `saveData` replaces too, so the same fragility is on the
+  real platform; nothing here introduces it.
+
+### 12.7 The storage inspector
+
+`games/crossy-road/storage.html` puts the game beside a table of its thirteen
+fields, each row showing the stored value *and* the value the frame holds right
+now, so a field that has not been read or written back yet is visible rather than
+implied. Until the bulk loader was enabled every row would have shown exactly
+that. Plus the raw document with Copy, Export `.txt`, Import, Reload and Reset.
+
+### 12.8 Verifying a Playables conversion
+
+The generic five steps in [section 13](#13-verifying-a-conversion) all apply. This
+game adds two that are specific to a host SDK, and both are cheap:
+
+1. **Count the reads and the writes, in order.** The save is written whole, so a
+   write built from a state that was never loaded is invisible in the document
+   after the fact — it is a perfectly well-formed blob, just the wrong one. A
+   temporary two-line log in the stand-in's `loadData`/`saveData` settles it in
+   one boot: *fourteen reads, then one write* is a game that read its save;
+   *one read, one write* is a game that wrote over what it never looked at, and
+   the write's payload is printed next to it.
+2. **Seed a save, boot, and check the game's own variables.** Not the document —
+   `iframe.contentWindow.Game.topScore` and its neighbours, i.e. what the game
+   believes. Editing the stored blob to `topScore: 777, coins: 300,
+   unlockedCharacters: [0, 1], currCharacter: 1` and reloading is the test; the
+   same values in `Game.*` afterwards, with nothing in the console, is the proof.
+
+One thing that looks like a fault and is not: a bare `@file test` block holding
+`0`. That is the game's own `localStorage` helper checking it has storage at all
+(`localStorage.setItem('test', 0)`), landing in the document like any other
+write. It carries no save data. It is also evidence that the Web Storage area
+succeeded — without it, that probe would have been a write to the browser's real
+store.
+
+---
+
+## 13. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success. The engine-specific half of each step is
 where the work is: [section 11.5](#115-verifying-a-web-storage-conversion) for a
 `localStorage` engine, [section 10.5](#105-verifying-a-godot-conversion) for a
-Godot export, and the notes at the end of sections 6–9 for the rest.
+Godot export, [section 12.8](#128-verifying-a-playables-conversion) for a host SDK,
+and the notes at the end of sections 6–9 for the rest.
 
 1. **The document appears.** `localStorage` holds one key, and it is readable
    text: `localStorage.getItem('plu:text:<game>')`.
@@ -1546,7 +1874,7 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 13. Inspecting a save
+## 14. Inspecting a save
 
 Every converted game has one, and they take the shape the engine needs:
 
@@ -1571,6 +1899,17 @@ game whose two store names collide with Big FLAPPY Tower's.
   `localStorage` engine, the selected key decoded with the game's own
   `base64.js` into its pipe-separated fields, the live game's cookies/bakery read
   out of the frame, and the raw document.
+- `games/core-ball/storage.html` — the one-key table for a game that saves by
+  property, the selected key decoded as a level number, the frame's own
+  `GlobalLevel` and the label its begin screen draws from it, and the raw
+  document.
+- `games/crazy-cattle-3d/storage.html` — the Godot file panel again, with `@dir`
+  blocks counted rather than listed, the selected `.tres` decoded into the
+  `name = value` fields the game wrote, and the frame's own flush count.
+- `games/crossy-road/storage.html` — the field table for a host-SDK game: the
+  game's own thirteen save fields, each with the stored value beside the value the
+  frame holds right now, the frame's screen and score, and the keys the area it
+  holds actually contains.
 
 All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
 Reload and Reset, and all of them listen for the `postMessage` that every write
@@ -1581,7 +1920,7 @@ To reuse one for another game, copy the page and change two things: the iframe
 
 ---
 
-## 14. Backends
+## 15. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -1602,7 +1941,7 @@ needs to change.
 
 ---
 
-## 15. Reference
+## 16. Reference
 
 ### API
 
@@ -1621,6 +1960,8 @@ needs to change.
 | `stores.localforage(name)` | the same store with node-style callbacks instead, for an engine written against the localforage global |
 | `stores.names()` | names of the stores the document holds, sorted |
 | `stores.entries(name)` | `[{key, tag, value}]`, decoded, for an inspector |
+| `installWebStorage()` | replace the page's `localStorage` with an area over the document (method *and* property access), or `null` if the browser refused |
+| `webStorage()` | the same area without installing it |
 | `prefs()` | the first PlayerPrefs block, decoded |
 | `getValue(name)` / `setValue(name, value, type)` | read/write one PlayerPrefs entry |
 | `clear()` | drop the save |
@@ -1659,7 +2000,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 16. Known limits
+## 17. Known limits
 
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
@@ -1723,18 +2064,51 @@ is what makes a re-encode safe to hand back.
   `iterate`, `setDriver`, `config`, `driver` and `dropInstance` throw
   "not implemented" in the shipped runtime already, so the adapter does not
   provide them either.
-- **A Web Storage area implements the methods, not the property access.** The
-  area installed by `installWebStorage()` answers `getItem`, `setItem`,
-  `removeItem`, `clear`, `key` and `length`, which is all Cookie Clicker uses. It
-  does not mirror each key as a property, so `localStorage.foo` is `undefined`
-  and `for (var k in localStorage)` sees nothing where a real area would list its
-  keys. A game that enumerates its own storage that way needs that added first —
-  silently mis-enumerating a save is worse than not supporting it.
+- **The Web Storage area's property surface needs `Proxy`.** The area installed
+  by `installWebStorage()` answers both ways — the six methods and
+  `localStorage[key]`, including `in`, `delete` and `Object.keys`
+  ([section 11.6](#116-the-second-surface-localstoragekey)) — but the property
+  half is a `Proxy`, so a browser without one gets the method surface only. Every
+  browser that runs these games has it; the fallback exists so that an old one
+  degrades to an empty save rather than to a thrown exception.
+- **A key named the same as a method is shadowed.** `localStorage.getItem = 1`
+  sets nothing on the real area either, so a game cannot store a key called
+  `getItem`, `length` or `clear` through property access; `setItem('getItem', …)`
+  still works. No game here does it.
+- **An engine's own endpoint cannot be removed, only refused.** Crazy Cattle 3D's
+  high-score URL lives in `index.wasm`, so the page blocks the host rather than
+  the code ([section 10.8](#108-an-endpoint-inside-the-engine)). The request is
+  gone from the network log; the engine still spends its timeout and still prints
+  "Update fail!" for a host it can no longer reach.
 - **Cookie Clicker still carries its cookie store in the source.**
   `WriteSave`'s "legacy system" branch assigns `document.cookie`, live in the file
   and unreachable in this build (`Game.useLocalStorage = 1`, never reassigned).
   Both of its readers are gone, so nothing can load from it, but a reader will
   find the code and should know why it is there.
+- **A host SDK cannot be loaded off the host.** Playables' `IN_PLAYABLES_ENV` is
+  `window !== window.parent`, so the real SDK either drops every save (top-level)
+  or hangs on a parent that never answers (framed), and either way it nulls
+  `localStorage` on the way past ([section 12.1](#121-what-the-sdk-does-when-there-is-no-host)).
+  The local stand-in is the only workable option, which also means the SDK's
+  surface has to be extended by hand when a game reaches for a member it does not
+  define yet.
+- **A store a game writes but never reads is a converted-looking store.**
+  Crossy Road shipped with its own bulk load commented out of the startup chain
+  ([section 12.3](#123-the-trap-the-games-own-load-path-may-be-dead-code)), so it
+  wrote its defaults over the save on every boot while the document looked
+  healthy. Check that a value survives a reload, not that a document exists.
+- **A host-SDK save only moves on the game's own events.** Crossy Road's blob is
+  rewritten on a new high score, a flag, a gumball prize, a coin change and a
+  sound toggle — nothing else. An edited field can therefore sit in the document
+  out of step with the frame's memory until one of those happens, which is
+  information, not drift: the inspector shows both columns side by side for
+  exactly this reason.
+- **A Playables game's leaderboard goes nowhere.** `engagement.sendScore()` is
+  answered locally and says so once in the console. The score is kept in the save;
+  the board is the host's and there is no host.
+- **`@file test` in a Web Storage game is not a save.** It is the game's own
+  capability probe (`localStorage.setItem('test', 0)`), stored like any other
+  write. Harmless, and worth not deleting: it is how you know the area swap took.
 - **The inspector is same-origin only.** The panel reads the backend directly,
   so a cross-origin game frame would need the `postMessage` path only.
 

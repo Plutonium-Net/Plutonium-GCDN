@@ -1,14 +1,51 @@
 <!DOCTYPE html>
-
-
 <!-- Pluto Game 9/11/2026 -->
-
-
-
 <html lang="en">
+
 <head>
-<script src="../../js/sync.js"></script>
+  <script src="../../js/plustore.js"></script>
+  <script>PluStore.configure({ game: 'crazy-cattle-3d', mount: '/userfs' });</script>
   <meta charset="utf-8">
+  <script>
+    /* The game carries its own score board: it POSTs the player's run to
+       crazycattle3d.io/api/highscores and asks the same host for an update,
+       both from inside the compiled engine, so the URL is in index.wasm and
+       not anywhere in this page. Refused here so that a local build neither
+       reports the player off-machine nor sits waiting on a request that
+       cannot succeed - the "Update fail!" line in Options is exactly that
+       wait ending. A refused request looks like any other failed request to
+       the engine, which is what an offline player saw anyway. */
+    (function () {
+      var BLOCK = /(^|\.)crazycattle3d\.io$/;
+      function blocked(url) {
+        try { return BLOCK.test(new URL(String(url), location.href).hostname); }
+        catch (e) { return false; }
+      }
+      var open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        this.pluBlocked = blocked(url);
+        return open.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function () {
+        if (this.pluBlocked) { try { this.abort(); } catch (e) {} return; }
+        return send.apply(this, arguments);
+      };
+      if (window.fetch) {
+        var realFetch = window.fetch;
+        window.fetch = function (input) {
+          var url = typeof input === 'string' ? input : (input && input.url);
+          if (blocked(url)) return Promise.reject(new TypeError('blocked: ' + url));
+          return realFetch.apply(this, arguments);
+        };
+      }
+      if (navigator.sendBeacon) {
+        var beacon = navigator.sendBeacon.bind(navigator);
+        navigator.sendBeacon = function (url, data) {
+          return blocked(url) ? false : beacon(url, data);
+        };
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
   <title>CrazyCattle3D</title>
   <style>
@@ -36,8 +73,8 @@
     }
 
     #status,
-    #status-splash, 
-    #status-progress { 
+    #status-splash,
+    #status-progress {
       position: absolute;
       left: 0;
       right: 0;
@@ -103,126 +140,12 @@
       z-index: 1;
     }
   </style>
-  <link id="-gd-engine-icon" rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/bubbls/cc3d-merge/index.icon.png" />
-  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/bubbls/cc3d-merge/index.apple-touch-icon.png" />
-
-  <script>
-
-    const CDN_BASE = 'https://cdn.jsdelivr.net/gh/bubbls/cc3d-merge/';
-    
-    async function mergeSplitFiles(baseName, numParts) {
-      try {
-        const parts = [];
-        for (let i = 1; i <= numParts; i++) {
-          parts.push(`${CDN_BASE}${baseName}.part${i}`);
-        }
-
-        console.log(`Merging ${baseName} from ${numParts} parts...`);
-        
-        const responses = await Promise.all(parts.map(part => 
-          fetch(part).catch(err => {
-            console.error(`Failed to fetch ${part}:`, err);
-            throw new Error(`Failed to load ${part}`);
-          })
-        ));
-        
-        for (let i = 0; i < responses.length; i++) {
-          if (!responses[i].ok) {
-            throw new Error(`Failed to load ${parts[i]}: ${responses[i].status} ${responses[i].statusText}`);
-          }
-        }
-
-        const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
-        
-        const totalSize = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
-        
-
-        const mergedArray = new Uint8Array(totalSize);
-        let offset = 0;
-        for (const buffer of buffers) {
-          mergedArray.set(new Uint8Array(buffer), offset);
-          offset += buffer.byteLength;
-        }
-
-        console.log(`${baseName} merged successfully: ${totalSize} bytes`);
-        return mergedArray.buffer;
-      } catch (error) {
-        console.error(`Error merging ${baseName}:`, error);
-        throw error;
-      }
-    }
-
-    window.mergedFiles = {
-      pck: null,
-      wasm: null
-    };
-
-    if (!window.originalFetch) {
-      window.originalFetch = window.fetch;
-    }
-
-    window.fetch = function(url, ...args) {
-      const urlStr = typeof url === 'string' ? url : url.toString();
-      
-      if (urlStr.includes('index.pck') && !urlStr.includes('.part')) {
-        console.log('Intercepting index.pck request');
-        return new Promise((resolve) => {
-          const checkData = setInterval(() => {
-            if (window.mergedFiles.pck) {
-              clearInterval(checkData);
-              resolve(new Response(window.mergedFiles.pck, {
-                status: 200,
-                statusText: 'OK',
-                headers: {
-                  'Content-Type': 'application/octet-stream',
-                  'Content-Length': window.mergedFiles.pck.byteLength
-                }
-              }));
-            }
-          }, 50);
-        });
-      }
-      
-      if (urlStr.includes('index.wasm') && !urlStr.includes('.part')) {
-        console.log('Intercepting index.wasm request');
-        return new Promise((resolve) => {
-          const checkData = setInterval(() => {
-            if (window.mergedFiles.wasm) {
-              clearInterval(checkData);
-              resolve(new Response(window.mergedFiles.wasm, {
-                status: 200,
-                statusText: 'OK',
-                headers: {
-                  'Content-Type': 'application/wasm',
-                  'Content-Length': window.mergedFiles.wasm.byteLength
-                }
-              }));
-            }
-          }, 50);
-        });
-      }
-      
-      return window.originalFetch.call(this, url, ...args);
-    };
-
-    (async function() {
-      try {
-        const [pckBuffer, wasmBuffer] = await Promise.all([
-          mergeSplitFiles('index.pck', 3),
-          mergeSplitFiles('index.wasm', 3)
-        ]);
-        
-        window.mergedFiles.pck = pckBuffer;
-        window.mergedFiles.wasm = wasmBuffer;
-        
-        console.log('All files merged and ready!');
-      } catch (error) {
-        console.error('Failed to merge files:', error);
-        alert('Failed to load game files. Please check that all .part files are uploaded to your CDN.\n\nError: ' + error.message);
-      }
-    })();
-  </script>
-  
+  <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+  <!-- The icon and the splash image pointed at the CDN folder this game was
+       proxied from, and the apple-touch-icon named a file that folder never
+       had, so it 404'd on every load. Both now read the copies beside this
+       page; the touch icon is gone rather than pointed at something that is
+       not an icon. -->
 </head>
 
 <body>
@@ -235,17 +158,24 @@
   </noscript>
 
   <div id="status">
-    <img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="https://cdn.jsdelivr.net/gh/bubbls/cc3d-merge/index.png" alt="">
+    <img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
     <progress id="status-progress"></progress>
     <div id="status-notice"></div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/gh/bubbls/cc3d-merge/index.js"></script>
-  <script> 
+  <!-- index.pck and index.wasm used to come from that same jsDelivr folder,
+       three parts each, merged at load time by this page's own fetch override.
+       The folder is over jsDelivr's package limit and refuses every file in it
+       now, so the game could not start at all. Both files are whole beside
+       this page — which is what a Godot export expects — and the merge and the
+       override are gone with them. -->
+
+  <script src="index.js"></script>
+  <script>
     const GODOT_CONFIG = {
       "args": [],
       "canvasResizePolicy": 2,
-      "ensureCrossOriginIsolationHeaders": true,
+      "ensureCrossOriginIsolationHeaders": false,
       "executable": "index",
       "experimentalVK": false,
       "fileSizes": {
@@ -331,4 +261,5 @@
     }());
   </script>
 </body>
+
 </html>
