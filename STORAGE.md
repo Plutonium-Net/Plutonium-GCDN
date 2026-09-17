@@ -8,7 +8,7 @@ The reference implementation and working example is `snow-rider-3d`. Read
 `games/snow-rider-3d/index.html` alongside this document.
 
 - Engine: [`js/plustore.js`](js/plustore.js)
-- Reading a save: [section 15](#15-inspecting-a-save)
+- Reading a save: [section 16](#16-inspecting-a-save)
 
 ---
 
@@ -133,6 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,7 +212,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
    `<script src="../../js/sync.js"></script>` — fifteen games are on PluStore
-   so far, and 19 of the 35 in this repo still load that bridge (`tiny-fishing`
+   so far, and 18 of the 34 in this repo still load that bridge (`tiny-fishing`
    loads neither, so it saves nothing at all yet).
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
@@ -225,7 +226,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 14](#14-verifying-a-conversion).
+   count in [section 15](#15-verifying-a-conversion).
 
 ---
 
@@ -366,7 +367,7 @@ records the real paths it found.
 ### 6.5 Applying an imported save
 
 Restoring happens at boot only, so an import is two steps — `PluStore.set(doc)`
-and then reload the frame ([section 15](#15-inspecting-a-save)).
+and then reload the frame ([section 16](#16-inspecting-a-save)).
 
 Both steps have to be inside the reload, because the running player is a writer:
 its sync tick serialises its own in-memory tree over whatever is in the backend
@@ -846,7 +847,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 14](#14-verifying-a-conversion)).
+what the game asks for ([section 15](#15-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -875,7 +876,7 @@ carries the LocalStorage plugin's keys and `c3-savegames-<project id>` the save
 slots. `PluStore.stores.names()` and `PluStore.stores.entries(name)` read them
 back decoded, which is how the key names in
 [section 8.6](#86-what-the-game-then-does-through-it) were found
-([section 15](#15-inspecting-a-save)).
+([section 16](#16-inspecting-a-save)).
 
 The project id is the one place a shared id shows up: three EO Interactive titles
 — Big FLAPPY, Big Tower Tiny Square 2 and Big NEON Tower — carry the same
@@ -1344,7 +1345,7 @@ Both decode without tooling. Buckshot Roulette's is binary —
 `user://buckshotroulette_options_12.shell` arrives as a `@base64` block and starts
 `f4 10 00 00 …`, with `setting_volume` legible inside it. Crazy Cattle 3D's is a
 text resource, `user://crazysavefile.tres`, so its `name = value` fields are in
-plain sight ([section 15](#15-inspecting-a-save)).
+plain sight ([section 16](#16-inspecting-a-save)).
 
 Two things a reader has to expect on a first run. The engine drops its own
 shader-cache directories into the document, so counting `@dir` blocks is easier
@@ -1488,7 +1489,7 @@ a game that swaps its own storage cannot take the document with it.
 The save is base64, so a reader cannot tell progress from the document alone; the
 game's own `base64.js` turns it back into its pipe-separated fields, and the
 cookie count on the screen is the game's own answer for the rest
-([section 15](#15-inspecting-a-save)).
+([section 16](#16-inspecting-a-save)).
 
 **Core Ball**, the other Web Storage engine here, keeps exactly one key:
 
@@ -1745,7 +1746,7 @@ whole can look perfectly healthy while the game is writing defaults over it
 
 ### 12.8 Verifying a Playables conversion
 
-The generic five steps in [section 14](#14-verifying-a-conversion) all apply. This
+The generic five steps in [section 15](#15-verifying-a-conversion) all apply. This
 game adds two that are specific to a host SDK, and both are cheap:
 
 1. **Count the reads and the writes, in order.** The save is written whole, so a
@@ -1931,7 +1932,7 @@ listing showed two rows for one file.
 
 With the player's own key names the seed lands outside the mount and there is
 nothing to collide. `flush()` still drops a tree file whose mounted path a hosted
-block already names ([section 17](#17-reference) for the API), because the
+block already names ([section 18](#18-reference) for the API), because the
 collision is a property of any host whose block names resolve inside the mount
 rather than of one configuration: a tree file with no hosted block behind it — the
 file that is only a file — is still written, and for an engine with no hosted
@@ -1996,7 +1997,7 @@ Then the game plays, and the save arrives: `Storage.put()` base64-encodes a
 database blob and calls `localStorage.setItem`, which the area turns into a block.
 The blob is **zlib-compressed JSON** — `{"v":6,"om":1,"os":1,"gc":{...}}` — so the
 document holds text, and the text is base64 of a compressed stream — so reading it
-means inflating it first ([section 15](#15-inspecting-a-save)).
+means inflating it first ([section 16](#16-inspecting-a-save)).
 
 ### 13.7 Applying a save from outside
 
@@ -2006,7 +2007,7 @@ shell flushes the whole mount when its page goes away, so clearing or replacing 
 document while an old player is still alive lets its dying flush put the old save
 straight back. Park the frame on `about:blank` (which unloads the player and lets it
 finish), change the document once it is gone, and only then start the game again
-([section 18](#18-known-limits)).
+([section 19](#19-known-limits)).
 
 The values that say whether any of it worked are the player's own:
 `Module._get_app_inited()`, and what the frame's `Storage.get(Storage.PREFIX, path)`
@@ -2061,7 +2062,159 @@ stripped prefix.
 
 ---
 
-## 14. Verifying a conversion
+## 14. Flash (Ruffle)
+
+`games/duck-life/` is a Mochi-era Flash build: one `duck-life.swf` played by
+Ruffle, a WASM Flash player. Nothing inside the movie is patched — this is the
+shortest conversion in the document — but two things about Ruffle are not
+obvious: the key its saves are named by, and the fact that its save is already
+`localStorage`.
+
+### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
+
+Flash's save is a `SharedObject`: a movie calls
+`SharedObject.getLocal("mydata")`, keeps state in `.data`, and writes it with
+`.flush()`. Duck Life's whole save is that one object —
+
+    stalvl  runlvl  flylvl  swilvl  seed  skill  money  colour  hat
+
+— and Ruffle keeps it in `localStorage`: its wasm carries
+`ruffle_web::storage::LocalStorageBackend` and reaches the browser through
+`window.localStorage`. A Flash game is therefore a Web Storage game
+([section 11](#11-web-storage-localstorage)) with one wrinkle, and the area swap
+in [section 11.1](#111-repair-the-area-not-the-call-sites) is the whole job.
+
+### 14.2 Load PluStore before `ruffle.min.js`
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>
+  PluStore.configure({ game: 'duck-life' });
+  var storage = PluStore.installSharedObjects('duck-life.swf');
+  if (!storage) { console.error('…the save would go to the browser store'); }
+</script>
+<script src="ruffle/ruffle.min.js"></script>
+```
+
+and the movie is handed over as before:
+
+```js
+player.load('duck-life.swf');
+```
+
+Order is not optional: Ruffle reads a movie's save as it loads it, so the area has
+to be in place before the movie starts. The movie name is the one argument the
+call needs — [section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)
+is why — and `installSharedObjects` returns the installed area or `null` if the
+browser refused the swap, exactly like `installWebStorage()`.
+
+### 14.3 The key Ruffle composes, and why the movie is named
+
+Ruffle names a slot after the movie's own URL, in Flash's own shape
+(`<domain><path>/<movie>.swf/<name>`), so what reaches the area is
+
+    127.0.0.1/games/duck-life/duck-life.swf/mydata
+
+The port is *not* part of that; the host is. The same folder opened as
+`http://localhost:5500/` asks for `localhost/games/duck-life/…` instead — a
+different key for the same save, which reads as progress that vanished when only
+the address changed. `installSharedObjects('duck-life.swf')` narrows every key to
+
+    duck-life.swf/mydata
+
+so the document holds a name that does not move with the page. The mapper only
+ever sees keys: a SharedObject's name is separate from the data inside it, so
+nothing within the save is rewritten by this.
+
+That the narrowing is real was measured rather than assumed. With it installed, a
+value written through a key composed for `127.0.0.1` reads back through the
+`localhost` spelling of the same key — one save, two hosts. The area also answers
+`key(i)` and `Object.keys()` in Ruffle's own spelling, so nothing that enumerates
+sees names it does not recognise.
+
+### 14.4 The surface Ruffle uses is the property one
+
+Wrapping the installed area and logging every way into it showed Ruffle reaching
+the area as `localStorage[name]` — a property read and a property write — and
+never through `getItem`/`setItem`. It wrote the same bytes nine times during one
+boot: Ruffle flushes a SharedObject on a schedule of its own, so `fileWrites` in
+`PluStore.stats()` counts a boot, not a save the player made.
+
+This is why [section 11.6](#116-the-second-surface-localstoragekey) exists. An
+area that answered only by method would leave Ruffle reading `undefined` and
+writing through a property that nothing serialises — silently, on every boot, with
+the movie loading and playing perfectly in between.
+
+### 14.5 What has to be vendored, and why both core pairs
+
+The published page loaded `ruffle.min.js` from jsDelivr and carried the save off
+through `js/sync.js`. Both are gone. What replaces them is the release that page
+already pinned (`@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2`, MIT / Apache-2.0, both
+licences kept beside it) copied into `games/duck-life/ruffle/`, plus the movie.
+
+**Both core pairs have to come along.** `ruffle.min.js` probes
+`WebAssembly.validate()` for SIMD and four other extensions and loads
+`core.ruffle.ae105…` + `f7f28e….wasm` when all five are present, falling back to
+`core.ruffle.9085…` + `4d8824….wasm` otherwise ("falling back to the vanilla
+WebAssembly module"). A current browser uses one pair and the other looks like
+13 MB of dead weight; a browser without SIMD has no player at all without it.
+
+One bug in the wrapper the page shipped with is worth recording, because it looks
+like a broken path and is not one: it called `player.load("$1")` — a template
+placeholder that was never filled in — so Ruffle was handed a four-character
+string where a movie belongs and nothing ever started.
+
+### 14.6 The calls that leave the machine, and the guard that stops them
+
+The movie carries MochiAds' preloader stub, which fetches
+`http://x.mochiads.com/srv/1/<id>.swf` and pings
+`http://mochibot.com/my/core.swf` every time the game is opened. Both URLs live
+*inside the SWF*, so there is nothing to delete in a script file — and both only
+ever failed anyway (a dead host sends no CORS headers), so refusing them changes
+nothing the movie does. The page refuses them in a `window.fetch` guard: same
+origin, `data:` and `blob:` pass; anything else is rejected with a warning, once
+per URL. Ruffle never uses `XMLHttpRequest` — its wasm contains no such string,
+and one `fetch_with_request` — so `window.fetch` is the whole surface.
+
+### 14.7 Reading the save, and applying one from outside
+
+A SharedObject's bytes are AMF0, base64'd into an `@file` block: an entry is a
+`uint16` name length, the name, one AMF0 type byte, then the payload — a number is
+`00` and eight big-endian bytes, a string is `02` and a prefixed length. So
+`duck-life.swf/mydata` can be read with no tooling at all:
+
+    @file duck-life.swf/mydata
+    AL8AAACxVENTTwAEAAAAAAAGbXlkYXRh…
+
+Two rules for writing one back by hand. A hand edit is inert until the page is
+reloaded. And a *live* player flushes its own in-memory save when the page goes
+away, which overwrites anything written while it was up — measured here: a
+doctored save written into the very page that was playing the game was replaced by
+the player's dying flush before the next boot could read it, while the same bytes
+written from a page that was *not* running the game were handed to Ruffle at the
+next boot and survived there.
+
+### 14.8 Verifying a Flash conversion
+
+- every request the page makes is loopback, and the two Mochi URLs appear as
+  refusals rather than as outbound requests;
+- no exceptions, and no IndexedDB — Ruffle uses none;
+- the document holds one block, keyed `duck-life.swf/mydata`;
+- the movie renders and responds to input. This is the check that says the player
+  works at all: the canvas is not blank, and a click changes the frame;
+- the round trip: write a doctored SharedObject from a page that is not playing
+  the game, load the game, and confirm both that Ruffle is handed exactly those
+  bytes and that the game's own variables keep them.
+
+Eight further Ruffle wrappers are in this repo still on the old bridge
+(`duck-life-2`, `duck-life-3`, `learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`,
+`motox3m-3`, `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the
+same three things: the player vendored, `installSharedObjects('<movie>.swf')`
+before it, and the movie named correctly.
+
+---
+
+## 15. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success. The engine-specific half of each step is
@@ -2175,7 +2328,7 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 15. Inspecting a save
+## 16. Inspecting a save
 
 There is nothing to install. The save is one plain-text string, and it is read
 through the same API that wrote it:
@@ -2194,7 +2347,7 @@ PluStore.on(function (doc) { ... }) // every write, as it happens
 Under the default backend that document lives in `localStorage` under
 `plu:text:<game>`, so a browser's own devtools read it as well (Application →
 Local Storage), and `PluStore.backends.<name>` decides where else it can live
-([section 16](#16-backends)).
+([section 17](#17-backends)).
 
 What a block holds, by engine:
 
@@ -2216,7 +2369,7 @@ Three decodes are worth doing by hand rather than reading raw:
   when the game stored `128` is a different save, not a formatting choice
   ([section 8.7](#87-store-values-carry-a-type-tag)).
 - **A `@unity-prefs` block.** `PluStore.prefs()` decodes it, and the seven header
-  bytes are carried through untouched ([section 17](#17-reference)).
+  bytes are carried through untouched ([section 18](#18-reference)).
 
 The document only changes through `set()` ([section 2](#2-the-contract)), so an
 edit made by hand is inert until the page reloads — and for an engine whose flush
@@ -2226,7 +2379,7 @@ before editing anything into a running page.
 
 ---
 
-## 16. Backends
+## 17. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -2247,13 +2400,14 @@ needs to change.
 
 ---
 
-## 17. Reference
+## 18. Reference
 
 ### API
 
 | Call | Does |
 |---|---|
 | `configure({game, key, mount, filePrefix, backend})` | set up before the game loads |
+| `installSharedObjects(movie)` | the Web Storage area, with Ruffle's host-shaped SharedObject keys narrowed to `"<movie>/<name>"` |
 | `get()` | the whole save as a string |
 | `set(doc)` | validate, store, and broadcast a document |
 | `list()` | `[{path, kind, keys}]` for every file in the save |
@@ -2306,7 +2460,23 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 18. Known limits
+## 19. Known limits
+
+- **A Flash save is named by the player, host and all.** Ruffle keys a
+  SharedObject `<domain><path>/<movie>.swf/<name>`, so the address the page was
+  opened from would be part of the save's name and `localhost` and `127.0.0.1`
+  would be two saves ([section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)).
+  `installSharedObjects(movie)` narrows it, and the movie argument is not
+  optional bookkeeping: leave it out and the save follows the hostname again.
+- **A Flash save is written on the player's schedule.** Ruffle flushes a
+  SharedObject on its own tick and once more as the page goes away, so
+  `fileWrites` counts a boot rather than a save, and a hand edit made while the
+  game is running can be overwritten by that dying flush before anything reads
+  it.
+- **A Flash conversion needs both Ruffle core pairs, and a movie that is named.**
+  The player picks its wasm by probing for WebAssembly extensions, so the pair a
+  current browser does not use still has to ship, and `player.load()` has to be
+  given a real movie rather than the placeholder a wrapper may carry.
 
 - **Fancade writes its mount back when its page goes away.** The player flushes the
   whole of `/sandbox` on unload, so clearing or replacing the document while an old
