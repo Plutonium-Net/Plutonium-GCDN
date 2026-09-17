@@ -76,13 +76,6 @@
     "cloudSync": false,
     "tags": []
   },
-  "crazy-cattle-3d": {
-    "description": "Drive a cattle around a chaotic 3D arena and slam into others until only one is left standing. Use speed, angles, and physics to knock rivals out before they do the same to you.",
-    "controls": [],
-    "banner": "images/crazy-cattle-3d.png",
-    "cloudSync": false,
-    "tags": []
-  },
   "crossy-road": {
     "description": "Hop across roads, rivers, and train tracks while chasing one more step forward. The rules are instant to understand, but the timing gets dangerous fast.",
     "controls": [],

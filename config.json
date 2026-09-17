@@ -72,12 +72,6 @@
       "image": "images/core-ball.png"
     },
     {
-      "id": "crazy-cattle-3d",
-      "name": "Crazy Cattle 3D",
-      "path": "games/crazy-cattle-3d/index.html",
-      "image": "images/crazy-cattle-3d.png"
-    },
-    {
       "id": "crossy-road",
       "name": "Crossy Road",
       "path": "games/crossy-road/index.html",
