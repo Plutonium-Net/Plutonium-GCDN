@@ -93,18 +93,19 @@ Ask the engine for its save bytes and hand the whole thing to `set()`:
 PluStore.set(document);
 ```
 
-Building that document is the only engine-specific part. For Unity the engine
-does it for you (`flush`, see [section 6](#6-unity-webgl)), and for GameMaker
-`PluStore.files` does (see [section 7](#7-gamemaker-html5)); for a
-key/value engine `PluStore.stores` does (see
-[section 8](#8-construct-3-html5)); for anything else you serialise the
+Building that document is the only engine-specific part. For Unity and for
+Godot the engine does it for you (`flush`, see [section 6](#6-unity-webgl) and
+[section 10](#10-godot-4-html5)), and for GameMaker `PluStore.files` does (see
+[section 7](#7-gamemaker-html5)); for a key/value engine `PluStore.stores` does
+(see [section 8](#8-construct-3-html5)); for anything else you serialise the
 engine's own storage into the format in [section 4](#4-document-format).
 
 ### 3.4 Restore the save
 
 Rebuild the engine's native storage from the document, then let the game start.
 `PluStore.get()` returns the raw document; `PluStore.parse(doc)` turns it into a
-tree of directories, `@unity-prefs` blocks, `@text` blocks and `@file` blocks.
+tree of directories, `@unity-prefs` blocks, `@text` blocks, `@base64` blocks for
+binary files and `@file` blocks.
 
 ```js
 var tree = PluStore.parse(PluStore.get());
@@ -121,6 +122,7 @@ exists today:
 | Engine | Adapter | Status |
 |---|---|---|
 | Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use |
+| Godot 4 HTML5 | the same two hooks, plus `is_persistent` answered from PluStore | implemented, in use |
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
@@ -194,8 +196,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — eight games are on PluStore so
-   far, and 26 in this repo still load that bridge.
+   `<script src="../../js/sync.js"></script>` — nine games are on PluStore so
+   far, and 25 in this repo still load that bridge.
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -208,7 +210,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 10](#10-verifying-a-conversion).
+   count in [section 11](#11-verifying-a-conversion).
 
 ---
 
@@ -759,7 +761,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 10](#10-verifying-a-conversion)).
+what the game asks for ([section 11](#11-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -1031,7 +1033,218 @@ menu:
 
 ---
 
-## 10. Verifying a conversion
+## 10. Godot 4 HTML5
+
+A Godot 4 web export has no save code of its own to find: `FileAccess`,
+`ConfigFile`, `ResourceSaver` and the engine's own log all go to one `user://`
+directory, and the player mounts that directory with Emscripten's IDBFS. The
+whole persistence layer is three functions in `<name>.js` — the emscripten glue,
+which a shipped export minifies onto one line. Re-formatted:
+
+```js
+is_persistent: function () { return GodotFS._idbfs ? 1 : 0; },
+
+init: function (persistentPaths) {
+  ...
+  GodotFS._mount_points.forEach(function (path) {
+    createRecursive(path);
+    FS.mount(IDBFS, {}, path);                                 // user:// is IndexedDB
+  });
+  return new Promise(function (resolve, reject) {
+    FS.syncfs(true, function (err) { ... resolve(err) });       // pull it out
+  });
+},
+
+sync: function () {
+  ...
+  return new Promise(function (resolve, reject) {
+    FS.syncfs(false, function (error) { ... resolve(error) });  // push it back
+  });
+}
+```
+
+The engine reaches only two of those, as wasm imports: `godot_js_os_fs_sync`
+calls `sync()`, and `godot_js_os_fs_is_persistent` reports `is_persistent()`.
+The second one is the trap. It is what tells Godot that `user://` survives a
+reload, and a player that answers "not persistent" stops asking to sync at all —
+so a conversion that mounts memory and forgets the gate produces a save that is
+never written and never wrong-looking.
+
+`buckshot-roulette` is the worked example: a `/userfs` mount, 20 files, 371 MB.
+
+### 10.1 Load PluStore before the player
+
+In the page's own `<head>`, above the engine script. The mount is named because
+Godot's is not Unity's:
+
+```html
+<script src="../../js/plustore.js"></script>
+<script>PluStore.configure({ game: 'buckshot-roulette', mount: '/userfs' });</script>
+```
+
+### 10.2 Make the export local first
+
+The wrapper page proxied a jsDelivr folder with `<base href>` —
+`gh/genizy/web-port@main/buckshot-roulette/` — and that copy is gone: jsDelivr
+refuses that account, so nothing loads from it today. GitHub raw is the copy
+that works, and the same folder.
+
+The build is one `wasm` and one `pck`, each split for size:
+
+| File | Parts | Total |
+|---|---|---|
+| `buckshot-roulette.pck` | 17 × 19.3 MB | 344,705,792 bytes |
+| `buckshot-roulette.wasm` | 3 × 13.8 MB | 43,444,261 bytes |
+
+Nothing needs writing to load them: the export's own `main.js` fetches every
+`.partN`, merges them into blobs and swaps `window.fetch` so the loader sees a
+single file. The repo already uses that convention (10 Minutes Till Dawn), so
+keeping the part names is the whole job. Two things must still line up:
+
+- **`GODOT_CONFIG.fileSizes`** records the *merged* sizes, and the loader checks
+them as it loads. A missing or short part fails loudly, which makes this the one
+place a truncated download cannot hide.
+- **`<base href>` must go**, or every relative path resolves against the dead
+  CDN. Once it is gone, the icon, splash and worklet scripts are local too.
+
+### 10.3 Cut the IndexedDB persistence
+
+Three edits in the glue file. All three are unique strings in the minified line.
+
+**Site 1 — the gate.** Without this the engine never asks to sync:
+
+```js
+is_persistent:function(){return GodotFS._idbfs?1:0}
+```
+
+```js
+is_persistent:function(){return GodotFS._idbfs||(self.PluStore&&self.PluStore.flush)?1:0}
+```
+
+**Site 2 — the mount and the seed.** The original mounts IDBFS and then pulls it
+out of IndexedDB, holding a run dependency open while that happens because
+`syncfs(true, …)` is asynchronous:
+
+```js
+GodotFS._mount_points.forEach(function(path){createRecursive(path);FS.mount(IDBFS,{},path)});return new Promise(function(resolve,reject){FS.syncfs(true,function(err){if(err){GodotFS._mount_points=[];GodotFS._idbfs=false;GodotRuntime.print(`IndexedDB not available: ${err.message}`)}else{GodotFS._idbfs=true}resolve(err)})})
+```
+
+The replacement mounts memory and seeds it from the document instead, and the
+whole `syncfs` promise goes away — seeding from a string is synchronous, so
+nothing is held open and no run dependency is needed:
+
+```js
+GodotFS._mount_points.forEach(function(path){createRecursive(path);if(self.PluStore&&self.PluStore.boot){FS.mount(MEMFS,{},path);self.PluStore.boot(FS,path)}else{FS.mount(IDBFS,{},path)}});if(self.PluStore&&self.PluStore.boot){return Promise.resolve()}return new Promise(function(resolve,reject){FS.syncfs(true,function(err){if(err){GodotFS._mount_points=[];GodotFS._idbfs=false;GodotRuntime.print(`IndexedDB not available: ${err.message}`)}else{GodotFS._idbfs=true}resolve(err)})})
+```
+
+**Site 3 — the flush.** The original push:
+
+```js
+sync:function(){if(GodotFS._syncing){GodotRuntime.error("Already syncing!");return Promise.resolve()}GodotFS._syncing=true;return new Promise(function(resolve,reject){FS.syncfs(false,function(error){if(error){GodotRuntime.error(`Failed to save IDB file system: ${error.message}`)}GodotFS._syncing=false;resolve(error)})})}
+```
+
+is replaced by one flush per mount point:
+
+```js
+sync:function(){if(GodotFS._syncing){GodotRuntime.error("Already syncing!");return Promise.resolve()}GodotFS._syncing=true;if(self.PluStore&&self.PluStore.flush){GodotFS._mount_points.forEach(function(path){self.PluStore.flush(FS,path)});GodotFS._syncing=false;return Promise.resolve(null)}return new Promise(function(resolve,reject){FS.syncfs(false,function(error){if(error){GodotRuntime.error(`Failed to save IDB file system: ${error.message}`)}GodotFS._syncing=false;resolve(error)})})}
+```
+
+Both `IDBFS` branches are left in the file on purpose: unreachable once PluStore
+is present, and deleting them is a larger edit for no benefit. `deinit` needs
+nothing — it unmounts the paths and closes `IDBFS.dbs` entries, which no longer
+exist.
+
+### 10.4 What the game then does
+
+The game's own code changes not at all. A `ConfigFile.save()` in GDScript still
+writes the same file at the same path; PluStore just owns where it lives:
+
+```
+boot   GodotFS.init → PluStore.boot(FS, "/userfs") → decode document → write files into memory
+play   the player reads and writes user:// freely, entirely in memory
+save   godot_js_os_fs_sync(0) → GodotFS.sync → flush each mount → walk → text → backend
+```
+
+**When the engine asks.** `sync()` runs when the player closes or renames a file
+— which includes the log rotation Godot performs at startup. Two consequences
+are worth knowing before verifying anything:
+
+- On a **clean install** there is nothing to rotate and nothing to close, so the
+document legitimately stays empty until the game saves something of its own. An
+empty document in the first seconds after boot is not a broken patch.
+- The **second boot** is usually the first loud flush, because the previous
+  run's `godot.log` is renamed on the way in.
+
+The worked example wrote its first real save when the options screen was left:
+`user://buckshotroulette_options_12.shell`, a binary file, so the document holds
+it as a `@base64` block (4.2 KB). The document also carries `logs/` and
+`shader_cache/` entries the engine created itself, and it grew from nothing to
+9,239 characters in one step.
+
+That file is the round trip. The language chosen in OPTIONS (`Español`) came
+back on the next boot — `EMPEZAR / OPCIONES / CRÉDITOS / SALIR` — from a save the
+game could only have read out of the document.
+
+### 10.5 Verifying a Godot conversion
+
+The FS and the engine's sync entry are both closure-local, so the page cannot
+reach them and neither can you. A temporary copy of the game page, with two
+wrappers installed before the player loads, reaches both:
+
+```html
+<script>
+  var boot = PluStore.boot;
+  PluStore.boot = function (FS, mount) { window.__FS = FS; window.__mount = mount; return boot.apply(this, arguments); };
+
+  /* The engine's sync entry is a wasm import, so it is only visible where the
+     imports are handed over. */
+  var real = WebAssembly.instantiateStreaming;
+  WebAssembly.instantiateStreaming = function (src, imports) {
+    for (var k in imports.env) {
+      if (/^godot_js_os_fs_(sync|is_persistent)$/.test(k)) window.__fns[k] = imports.env[k];
+    }
+    return real.call(WebAssembly, src, imports);
+  };
+</script>
+```
+
+With those, the two directions are one call each. To watch a save:
+`__FS.writeFile(...)`, then call the engine's own `__fns.godot_js_os_fs_sync(0)`
+and read the document. To watch a load: put a file in the document, reload, and
+read it back out of `__FS` — a text file, a nested directory and a 300-byte
+binary all compare byte-exact, which is what says the `@base64` path works and
+not just the `@text` one. Then the store itself: `indexedDB.databases()` returns
+`[]`, and the only `localStorage` keys are PluStore's.
+
+Unlike the Construct titles, this engine takes ordinary DOM input, so the game
+can be driven for real: dispatch `mousemove`/`mousedown` on `#canvas` and
+`mouseup` on `window` and the menus respond. Two practical notes — the title
+menu is still animating for a while after boot, so take a screenshot at the
+moment you click and aim from that, and the engine *reports* whether it consumed
+a click (the wasm callback's return value), which is a precise hit test when a
+click seems to do nothing.
+
+Two console lines are worth recognising and ignoring:
+
+- **`TypeError: func is not a function`.** The engine makes a fire-and-forget
+  sync call with a null callback; the glue does `GodotRuntime.get_func(0)` and
+  then calls the result. The flush has already happened by then. It is upstream,
+  and the IDBFS build behaves the same way.
+- **`SampleNode._pause … reading 'currentTime'`.** An audio exception in this
+  build when the AudioContext is still suspended; unrelated to storage.
+
+### 10.6 The storage inspector
+
+`games/buckshot-roulette/storage.html`: the mounted `user://` tree (path, kind,
+size), a decoded view of the selected file — text inline, binary as a byte count
+and a hex head — and the raw document with the same Copy / Export / Import /
+Reload / Reset row every other panel has. It was verified against the game's real
+options save, which decodes as `4344 bytes` starting `f4 10 00 00 …` with
+`setting_volume` legible in it.
+
+---
+
+## 11. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success.
@@ -1139,7 +1352,7 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 11. Inspecting a save
+## 12. Inspecting a save
 
 Every converted game has one, and they take the shape the engine needs:
 
@@ -1156,6 +1369,9 @@ game whose two store names collide with Big FLAPPY Tower's.
 - `games/big-ice-tower-tiny-square/storage.html` — the store panel for a
   Construct 2 build: one populated store named `localforage`, and a second
   listed store (`_C2SaveStates`) that exists but holds nothing.
+- `games/buckshot-roulette/storage.html` — the file tree for a Godot build: the
+  mounted `user://` tree, the selected file decoded (text inline, binary as a
+  byte count and a hex head), and the raw document.
 
 All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
 Reload and Reset, and all of them listen for the `postMessage` that every write
@@ -1166,7 +1382,7 @@ To reuse one for another game, copy the page and change two things: the iframe
 
 ---
 
-## 12. Backends
+## 13. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -1187,7 +1403,7 @@ needs to change.
 
 ---
 
-## 13. Reference
+## 14. Reference
 
 ### API
 
@@ -1211,7 +1427,7 @@ needs to change.
 | `clear()` | drop the save |
 | `on(cb)` / `off(cb)` | subscribe to changes |
 | `stats()` | `{game, key, mount, booted, flushed, fileWrites, storeWrites, savedAt, lastError}` |
-| `boot(FS, mount)` / `flush(FS, mount)` | Unity hooks, called from the patched player |
+| `boot(FS, mount)` / `flush(FS, mount)` | the Unity and Godot hooks, called from the patched player |
 
 ### PlayerPrefs binary layout
 
@@ -1244,7 +1460,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 14. Known limits
+## 15. Known limits
 
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
@@ -1262,6 +1478,15 @@ is what makes a re-encode safe to hand back.
   zero IndexedDB.
 - **Nothing is migrated.** A game converted from the old bridge starts from a
   clean save unless you import it by hand.
+- **Godot saves when it feels like it.** The engine calls for a sync when it
+  closes or renames a file, so a clean install writes nothing until the game
+  saves something of its own — and a game whose only `user://` traffic is the
+  log may flush nothing on a first run at all. An empty document right after
+  boot is expected, not a dead patch.
+- **A Godot save is often binary.** `ConfigFile` is text, but resource and
+  settings files are not, and they arrive as `@base64` blocks. That keeps the
+  document text and lossless, but it is not editable by hand the way a prefs
+  row is.
 - **A hosted file map rewrites the document per file.** Every
   `PluStore.files.write` re-serialises the whole save. At the few kilobytes these
   games keep that is free; a game with a large save wants batching.
