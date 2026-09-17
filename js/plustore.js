@@ -485,6 +485,21 @@
     }
   }
 
+  /* Writing bytes is the one emscripten call whose meaning changed under us. An
+     old player (Unity 5.x, emscripten 1.35) reads a two-argument writeFile as
+     *UTF-8 text*: it runs the value through stringToUTF8Array, which turns every
+     byte of a Uint8Array into "str.charCodeAt is not a function" — after opening
+     the file, so the restore leaves a save full of empty files and no usable
+     error. The stream calls below mean the same thing in every version. */
+  function writeBytes(FS, path, bytes) {
+    var stream = FS.open(path, 'w');
+    try {
+      FS.write(stream, bytes, 0, bytes.length, 0);
+    } finally {
+      FS.close(stream);
+    }
+  }
+
   function restoreTree(FS, tree) {
     var i;
     for (i = 0; i < tree.dirs.length; i++) mkdirp(FS, tree.dirs[i]);
@@ -493,9 +508,9 @@
       var slash = f.path.lastIndexOf('/');
       if (slash > 0) mkdirp(FS, f.path.slice(0, slash));
       try {
-        if (f.kind === 'prefs') FS.writeFile(f.path, encodePrefs(f.prefs));
-        else if (f.kind === 'base64') FS.writeFile(f.path, bytesFromB64(f.b64));
-        else FS.writeFile(f.path, textToBytes(f.text));
+        if (f.kind === 'prefs') writeBytes(FS, f.path, encodePrefs(f.prefs));
+        else if (f.kind === 'base64') writeBytes(FS, f.path, bytesFromB64(f.b64));
+        else writeBytes(FS, f.path, textToBytes(f.text));
       } catch (e) { warn('could not restore ' + f.path + ': ' + e); }
     }
   }

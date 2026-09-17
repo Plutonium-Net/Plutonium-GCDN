@@ -241,6 +241,12 @@ Build/UnityLoader.js                              ← loader; leave alone
 Build/<name>.wasm.framework.unityweb.js           ← player glue; patch this
 ```
 
+A Unity 5.x export puts the same glue somewhere else: `Release/<name>.js`, beside
+`Release/<name>.asm.js`, `<name>.mem` and `<name>.data`, loaded by
+`Release/UnityLoader.js`. It is an asm.js build rather than a wasm one, but the
+file to patch and the two sites inside it are the same — see
+[section 6.6](#66-the-asmjs-era-layout).
+
 The framework file is minified onto a handful of enormous lines. Find the two
 spots by searching for these markers:
 
@@ -257,13 +263,13 @@ follow — the file is minified onto a few enormous lines.
 the code, not for one exact snippet. Two variants are known to be in this
 catalogue:
 
-| | Unity 2018 (Snow Rider 3D) | Unity 2019+ (10 Minutes Till Dawn) |
-|---|---|---|
-| boot | `FS.mount(IDBFS,{},…)` then `FS.syncfs(true,…)` | identical |
-| flush call | `_JS_FileSystem_Sync()` | identical |
-| tick | `_JS_FileSystem_SetSyncInterval(ms)` | `_JS_FileSystem_Initialize()`, which registers the same timer itself via `Module.setInterval(…, fs.syncInternal)` |
-| `fs` literal | `sync:(…)` with `numPendingSync` | same, plus a `syncInternal` period field |
-| boot wrapper | bare `Module["preRun"].push(…)` | the same push, wrapped in an `if(typeof ENVIRONMENT_IS_PTHREAD==="undefined"||!ENVIRONMENT_IS_PTHREAD){…}` guard |
+| | Unity 2018 (Snow Rider 3D) | Unity 2019+ (10 Minutes Till Dawn) | Unity 5.5 (Cluster Rush) |
+|---|---|---|---|
+| boot | `FS.mount(IDBFS,{},…)` then `FS.syncfs(true,…)` | identical | identical |
+| flush call | `_JS_FileSystem_Sync()` | identical | identical |
+| tick | `_JS_FileSystem_SetSyncInterval(ms)` | `_JS_FileSystem_Initialize()`, which registers the same timer itself via `Module.setInterval(…, fs.syncInternal)` | `_JS_FileSystem_SetSyncInterval(ms)`, as 2018 |
+| `fs` literal | `sync:(…)` with `numPendingSync` | same, plus a `syncInternal` period field | same as 2018 |
+| boot wrapper | bare `Module["preRun"].push(…)` | the same push, wrapped in an `if(typeof ENVIRONMENT_IS_PTHREAD==="undefined"||!ENVIRONMENT_IS_PTHREAD){…}` guard | bare `Module["preRun"].push(…)` |
 
 Replace only the `push(...)` statement and leave any `ENVIRONMENT_IS_PTHREAD`
 wrapper in place — it gates the whole filesystem step, not just this part.
@@ -347,6 +353,65 @@ records the real paths it found.
 Restoring happens at boot only, so an import is two steps — `PluStore.set(doc)`
 and then reload the frame. `games/snow-rider-3d/storage.html` does exactly this
 and is the model to copy for another game.
+
+Both steps have to be inside the reload, because the running player is a writer:
+its sync tick serialises its own in-memory tree over whatever is in the backend
+about once a second, whatever you put there. Editing the document under a live
+frame and *then* reloading is a race the tick wins. To test a save by hand, pin
+the backend first (`PluStore.flush = function () {}`) or stop the frame, and only
+then write and reload.
+
+### 6.6 The asm.js era layout
+
+Cluster Rush is a Unity 5.5 export: `Release/NG.js` (the glue), `NG.asm.js`,
+`NG.mem`, `NG.data`, and `Release/UnityLoader.js` in place of the wasm-era
+files. The glue is loaded by URL rather than inlined, so find the two sites with
+the same greps as above and make the same two replacements; `fs`,
+`_JS_FileSystem_SetSyncInterval` and `_JS_FileSystem_Sync` are all present and
+all have the `if(!Module.indexedDB) return;` gate to remove. The mounting step is
+identical, including the `unityFileSystemInit` wrapper.
+
+Two things about this era are worth knowing before converting one.
+
+**A two-argument `FS.writeFile` means "UTF-8 text" in this emscripten**, and a
+typed array is not text. `FS.writeFile(path, bytes)` runs the array through
+`stringToUTF8Array`, throws *after* it has created the file, and leaves a
+zero-length file behind — `boot()` reported no error and restored nothing. The
+shared adapter writes through a stream instead:
+
+```js
+function writeBytes(FS, path, bytes) {
+  var stream = FS.open(path, 'w');
+  try { FS.write(stream, bytes, 0, bytes.length, 0); }
+  finally { FS.close(stream); }
+}
+```
+
+`open`/`write`/`close` exists in every version in this catalogue and takes the
+bytes as bytes, so this is the only form worth using. It was verified in both
+directions on a Unity 5.5 build (a 64-byte binary and a text file with a tab and
+trailing spaces, byte-exact through restore and flush) and on Unity 2018.
+
+**The player carries its own telemetry, and it keeps it in the save.** Unity
+5.5's analytics SDK is compiled into the player, endpoints and all: they sit in
+`NG.mem` as `stats.unity3d.com/HWStats.cgi`,
+`stats.unity3d.com/HWStatsUpdate.cgi`, `api.uca.cloud.unity3d.com/v1/events`,
+`cdp.cloud.unity3d.com/v1/events` and `config.uca.cloud.unity3d.com`, and the
+player calls them on its own schedule. Editing them out means editing the
+compiled image. A
+cache with no network access will fail those requests anyway, but do not let
+them look like a broken conversion — Cluster Rush refuses them at the page level
+with a small `XMLHttpRequest`/`fetch`/`sendBeacon` guard in `index.html`, the
+same way [section 5](#5-removing-the-old-storage-method) refuses a remote engine
+script.
+
+The consequence for verification is that **a Unity 5.5 save is not empty after a
+first boot.** The player writes `Analytics/config`, `Analytics/values` and one
+`ArchivedEvents/…` directory into the mount before the game saves anything of
+its own, so a document that appears on a clean install is the SDK's doing and not
+a sign that an old save was migrated. Cluster Rush's own keys — `UnlockedLevel`,
+`LEVEL`, `Cleared`, `S_Sound`, `StatsDone`, `SaveTime_Menu` — sit in the same
+`PlayerPrefs` file as `unity.*` entries nobody asked for.
 
 ---
 
@@ -1282,7 +1347,9 @@ failure mode that looks like success.
    `bacon-may-die` does across all seven files.
 4. **A hand-edited value reaches the game.** Change a stored value, reload, and
    confirm the game read it. Re-installs and re-defaults mean the seed did not
-   parse.
+   parse. Change it with the player stopped or its flush pinned
+   ([section 6.5](#65-applying-an-imported-save)) — a live player writes its own
+   tree back over your edit on the next tick, and then the test proves nothing.
 5. **No errors.** `PluStore.stats().lastError` is `null` after a boot and a save.
 
 When the old store is IndexedDB [section 8.3](#83-make-the-engine-local-first-and-check-it)
@@ -1356,8 +1423,9 @@ Two things Big NEON Tower made worth doing on top of that:
 
 Every converted game has one, and they take the shape the engine needs:
 
-- `games/snow-rider-3d/storage.html`, `10-minutes-till-dawn`, `backrooms-3d` —
-  the decoded PlayerPrefs table, the file tree, and the raw document.
+- `games/snow-rider-3d/storage.html`, `10-minutes-till-dawn`, `backrooms-3d`,
+  `games/cluster-rush/storage.html` — the decoded PlayerPrefs table, the file
+  tree, and the raw document.
 - `games/bacon-may-die/storage.html` — the file list (name, type, size, first
   line), a decoded view of the selected file (an `.ini` as key/value rows, a
   `.json` pretty-printed), and the raw document.
@@ -1483,6 +1551,11 @@ is what makes a re-encode safe to hand back.
   saves something of its own — and a game whose only `user://` traffic is the
   log may flush nothing on a first run at all. An empty document right after
   boot is expected, not a dead patch.
+- **A Unity save is never empty after one boot.** The analytics SDK writes into
+  the mount before the game saves anything of its own
+  ([section 6.6](#66-the-asmjs-era-layout)), so "the document exists" is not
+  evidence that anything was migrated, and "the save has files in it" does not
+  mean the game has progress.
 - **A Godot save is often binary.** `ConfigFile` is text, but resource and
   settings files are not, and they arrive as `@base64` blocks. That keeps the
   document text and lossless, but it is not editable by hand the way a prefs
