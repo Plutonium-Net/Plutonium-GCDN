@@ -590,6 +590,12 @@ the build: a new game guid or version means editing that line. The alternative �
 keying the document by the prefixed name — would put a guid and a build number
 inside the save file.
 
+It is only safe for an engine that is handed composed names and never enumerates
+its own key space, which is this runner's shape. Fancade's player is the
+counter-example: it walks `localStorage.key(i)` and rejects any key without its own
+prefix, so stripping it there hides every file from the player while every direct
+read still answers ([section 13.1](#131-the-engines-own-storage-in-two-layers)).
+
 ---
 
 ## 8. Construct 3 HTML5
@@ -1437,7 +1443,10 @@ reading it back is the same read. Both are real ways to use a Storage area and
 some games only ever use the second ([section 11.6](#116-the-second-surface-localstoragekey)).
 
 The area's keys ride in the same document as `@file` blocks, one block per key,
-so the save is readable text in the document like every other conversion. The
+so the save is readable text in the document like every other conversion. Their
+names are the game's own, and for a game that *enumerates* the key space — rather
+than asking for keys it already knows — they have to stay that way
+([section 13.1](#131-the-engines-own-storage-in-two-layers)). The
 methods are defined non-enumerable, the way a real Storage has them on its
 prototype, so `Object.keys(localStorage)` inside the game lists the game's own
 keys and not the five method names.
@@ -1764,9 +1773,9 @@ store.
 ## 13. Fancade (Poki)
 
 `games/drive-mad/` — a Fancade web player, wrapped for Poki. Two things make it
-different from every conversion before it: the save and the player's own
-filesystem hold the same bytes under two spellings, and the page would not run at
-all until something in it was *removed*.
+different from every conversion before it: the player loads its save by
+*enumerating* the key space it was given, and the page would not run at all until
+something in it was *removed*.
 
 ### 13.1 The engine's own storage, in two layers
 
@@ -1778,28 +1787,71 @@ The player keeps its database in `localStorage`, one base64 blob per path:
     com.martinmagni.drivemad/version                "this database was migrated"
     startup-time                                    which tab loaded last
 
-`webapp/source_min.js` is that whole layer. `Storage.init(path_max)` runs
-`migrate0()`, then `sync()` — which walks those keys and pushes every path into
-the player through `_storage_write` — then writes the version stamp.
-`Storage.write` and `Storage.remove` go back out through `setItem` / `removeItem`.
-Every call is already `localStorage`, so this half is a Web Storage conversion
+`webapp/source_min.js` is that whole layer, and it is small:
+
+    Storage.init(path_max)   migrate0(); sync(); write the version stamp
+    Storage.sync()           walk localStorage.key(i), hand each stored file to the player
+    Storage.write(...)       put(PREFIX, path, data) → setItem
+    Storage.remove(...)      removeItem(PREFIX + path)
+
+Every call is already `localStorage`, so this is a Web Storage conversion
 ([section 11](#11-web-storage-localstorage)) and the page installs the area before
 the player loads:
 
-    PluStore.configure({ game: 'drive-mad', filePrefix: 'com.martinmagni.drivemad/data/' });
+    PluStore.configure({ game: 'drive-mad' });
     var storage = PluStore.installWebStorage();
 
-`filePrefix` is what makes the document readable. The prefix is bookkeeping, so it
-is stripped on the way in and the blocks are named the game's own paths
-(`sandbox/db`). The two keys that do *not* carry it — the version stamp and
-`startup-time` — keep their full names, which is the honest thing to show: the
-player looks them up by those names, and they are not the save.
+**The prefix must not be stripped here**, and this is the one thing about this
+engine that is easy to get wrong, because everything else about it still works when
+you do. `sync()` is the only path by which the browser's stored files reach the
+engine — `init()` calls it once, before `app_init` — and it begins by enumerating
+the key space and **skipping anything that does not begin with the player's own
+prefix**:
 
-The second layer is the player's own filesystem. The build mounts a filesystem at
-`/sandbox` and seeds it before `app_init`, which is why a converted Drive Mad keeps
-its progress as a *key* (`sandbox/db`, through the area) and a *file*
-(`/sandbox/db`, through the mount) — the same bytes, twice, and a flush has to know
-they are one file ([section 13.4](#134-a-block-and-its-file-are-one-file)).
+    for (let i = 0; i < len; i++) {
+      key = localStorage.key(i);
+      if (key === null || !key.startsWith(Storage.PREFIX)) continue;   // the gate
+      path = key.slice(Storage.PREFIX.length);
+      data = Storage.get(Storage.PREFIX, path);
+      if (data === null) continue;
+      _storage_write(path_ptr, data_ptr, data_len);                     // the engine
+    }
+
+Configure the area with `filePrefix: 'com.martinmagni.drivemad/data/'` and every
+key it stores loses exactly that prefix, so `key(i)` answers `sandbox/db`, which
+does not start with it. The gate rejects every key, the loop completes having
+pushed nothing, and the player boots with no database at all: the game reports that
+it could not load its progress, on every boot, however healthy the document looks.
+Nothing else notices. The document is complete and readable, `Storage.get(prefix,
+path)` still answers — that call composes the prefix itself, and the area strips it
+again — `PluStore.stats()` is clean, and there is no error anywhere to follow. The
+only visible sign is the player's own message.
+
+So the area keeps the player's key space, and the document is keyed by the names
+the player itself looks for: `com.martinmagni.drivemad/data/sandbox/db` and its two
+siblings. `com.martinmagni.drivemad/version` and `startup-time` keep their own names
+as well; neither carries the data prefix, so the same gate skips them, and they are
+not files the player loads.
+
+`filePrefix` is a display convenience, and [section 7.5](#75-the-storage-prefix) is
+the case where it is safe: a GameMaker runner is handed fully-composed names by its
+own `_794()` helper and never lists anything back. An engine that walks its own key
+space has to keep that key space intact — what decides is the enumeration, not the
+engine.
+
+The second layer is the player's own filesystem: the build mounts one at `/sandbox`
+and seeds it from the document before `app_init`. That seeding is not how the save
+is loaded (the engine gets it through `_storage_write`), and with the player's own
+key names it does not even land in the mount — a block named
+`com.martinmagni.drivemad/data/sandbox/db` is written as a *relative* path, so it
+resolves against the filesystem root
+([section 13.4](#134-a-block-and-its-file-can-be-one-file)).
+
+A document written while the prefix *was* stripped keeps its `sandbox/db` blocks.
+They are inert — the boot gate ignores them — and they are worth clearing once, but
+nothing breaks if they stay: the next flush drops the mounted copy of each one
+([section 13.4](#134-a-block-and-its-file-can-be-one-file)), so the cost is a stale
+row in the save until the game next writes.
 
 ### 13.2 Load PluStore before the player
 
@@ -1812,7 +1864,7 @@ every file verified against its content hash.
 
     <script src="../../js/plustore.js"></script>
     <script>
-      PluStore.configure({ game: 'drive-mad', filePrefix: 'com.martinmagni.drivemad/data/' });
+      PluStore.configure({ game: 'drive-mad' });   /* no filePrefix — see 13.1 */
       var storage = PluStore.installWebStorage();
       if (!storage) { console.error(...); }
     </script>
@@ -1859,28 +1911,32 @@ the operation it guards. Nothing is lost by that: with a synchronous backend the
 is no window in which a second sync could overlap the first, which is the only
 thing that guard was ever for.
 
-### 13.4 A block and its file are one file
+### 13.4 A block and its file can be one file
 
-`readTree()` names a file by its path (`/sandbox/db`); a hosted block is named by
-the engine's own key (`sandbox/db`); `restoreTree()` writes a block's name as a
-path, resolved against the player's root. So for this engine the two spellings land
-on the same file:
+`readTree()` names a file by the path it walked to (`/sandbox/db`), while a hosted
+block keeps whatever key the engine asked for. `restoreTree()` writes a block's
+name as a path, and a *relative* name resolves against the filesystem root — so the
+two names only collide when the host's spelling of a key resolves into the mount:
 
-    @file sandbox/db      the save, as the player's localStorage key
-    @file /sandbox/db     the same save, as a path in the mount
+    @file sandbox/db                                → /sandbox/db, inside the mount
+    @file com.martinmagni.drivemad/data/sandbox/db  → /com.martinmagni…/sandbox/db
 
-A flush reads the mount and carries the hosted blocks into one document, so it
-wrote the save twice — and once written, the next boot seeded the mount from both
-blocks and the flush after that wrote both again. The document merely looked
-bigger; nothing was lost, but the save was in it twice for good, and a listing
-showed two rows for one file.
+While this page stripped the prefix — [section 13.1](#131-the-engines-own-storage-in-two-layers)
+is why it no longer does — the save *was* the first spelling, so the seed landed
+exactly on the player's own `/sandbox/db`. A flush walks the mount and carries the
+hosted blocks into the same document, so it wrote the save twice, and once written
+the next boot seeded the mount from both blocks and the flush after that wrote both
+again. Nothing was lost, but the save was in the document twice for good, and a
+listing showed two rows for one file.
 
-`flush()` now drops a tree file whose mounted path a hosted block already names
-([section 17](#17-reference) for the API). It is the same file, so nothing needs
-carrying twice: the block restores the path at the next boot, and a tree file with
-no hosted block behind it — the file that is only a file — is still written. For an
-engine with no hosted blocks at all, which is every Unity and Godot conversion, the
-new filter has nothing to drop and behaves exactly as before.
+With the player's own key names the seed lands outside the mount and there is
+nothing to collide. `flush()` still drops a tree file whose mounted path a hosted
+block already names ([section 17](#17-reference) for the API), because the
+collision is a property of any host whose block names resolve inside the mount
+rather than of one configuration: a tree file with no hosted block behind it — the
+file that is only a file — is still written, and for an engine with no hosted
+blocks at all, which is every Unity and Godot conversion, the filter has nothing to
+drop and behaves exactly as before.
 
 ### 13.5 The Poki SDK — and the sitelock that had to go
 
@@ -1962,21 +2018,46 @@ The player is a wasm app with its own notion of "inited", and almost all of its
 state is inside the wasm, so the checks that work are the ones the player and the
 engine report about themselves:
 
+- **What the boot handed the engine.** This is the check that matters, and the one
+  a direct read cannot replace, because `sync()` is the only path from the document
+  into the player. Wrap it for one boot and log the keys it accepts:
+
+  ```js
+  var orig = Storage.sync;
+  Storage.sync = function () {
+    window.__paths = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(Storage.PREFIX) === 0) window.__paths.push(k.slice(Storage.PREFIX.length));
+    }
+    return orig.apply(this, arguments);
+  };
+  ```
+
+  A boot with a save in the document must list `sandbox/db` and its siblings. An
+  empty list beside a full document is
+  [section 13.1](#131-the-engines-own-storage-in-two-layers): the prefix, not the
+  data.
 - `Module._get_app_inited()` — 0 means the mount or `app_init` never ran. This is
   the single most useful value in this engine: the loading screen looks the same
   whether the game is booting or dead.
 - `PluStore.stats()` — `booted` counts the mount's seed, `flushed` the writes back,
   and `fileWrites` the game's own `setItem`s.
 - `Storage.get(Storage.PREFIX, path)` in the frame — the engine's own read path,
-  which decodes exactly what the document holds.
+  which decodes exactly what the document holds. It proves the document is
+  readable, and *not* that the player was given anything: that call composes the
+  prefix itself, so it answers even when the boot loop accepted nothing.
 - the area's keys, via `Object.keys(localStorage)` in the frame: they are the
   document's blocks, so a game that "saved" without writing is visible as an empty
   list.
 
-The read path is best proved by writing a file the game has never written. Inject
-`@file sandbox/probe-file` with `aGVsbG8=` — base64 for `hello` — reload, and ask
-the player for it: `Storage.get` answering `hello` is the document's value arriving
-through the engine's own code, with the engine's own backup files intact beside it.
+A file the game has never written is worth injecting, because it comes back only if
+the boot loop passed it: add
+`@file com.martinmagni.drivemad/data/sandbox/probe-file` holding `aGVsbG8=` — base64
+for `hello` — reload, and ask the player for it through
+`Storage.get(Storage.PREFIX, 'sandbox/probe-file')`. It answers `hello` when the
+area and the engine agree on the key space, which is the check that catches a
+stripped prefix.
 
 ---
 
@@ -2233,10 +2314,18 @@ is what makes a re-encode safe to hand back.
   the frame on `about:blank` first, wait, then write and restart
   ([section 13.7](#137-applying-a-save-from-outside)). A Unity or Godot game has the
   same hazard, since its flush runs on the way out too.
-- **A Fancade save is two things at once.** [Section 13.4](#134-a-block-and-its-file-are-one-file)
-  covers the doubling that `flush()` now avoids; the remaining asymmetry is that the key
-  and the file are restored by different routes at boot, so the mount always carries a
-  copy of the area rather than the other way round.
+- **A Fancade save is a key space, not a file.** The player loads its database by
+  enumerating `localStorage` and asking for every path it finds, so the area has to
+  keep the player's own key names
+  ([section 13.1](#131-the-engines-own-storage-in-two-layers)). The mounted copy the
+  same document produces is incidental, and where it lands depends on how the host
+  spells its keys ([section 13.4](#134-a-block-and-its-file-can-be-one-file)).
+- **A stripped storage prefix can hide the whole save.** `filePrefix` renames every
+  key the area stores, and that is safe only for an engine that hands PluStore
+  fully-composed names and never lists them back. An engine that enumerates — as
+  this one does, gating on its own prefix — then sees a key space with nothing it
+  recognises: it boots empty and reports a save it cannot load, while the document,
+  the stats and every direct read look perfect.
 - **A Fancade save is a compressed blob.** `sandbox/db` is zlib-compressed JSON as base64,
   with two sibling backups the player maintains itself. Reading it means inflating it;
   editing it means editing a stream, not fields.
