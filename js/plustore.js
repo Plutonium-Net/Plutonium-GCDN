@@ -62,16 +62,40 @@
      knows about IndexedDB, files, or the network. Swap `PluStore.backend`
      for any object with read()/write() to move the save somewhere else. */
 
+  /* The browser's own Storage, captured once while nothing has replaced it.
+
+     This is not incidental. A game page may swap window.localStorage for an
+     area of its own — that is what installWebStorage does — and the document
+     must not follow that swap: the document lives in the browser's store, the
+     game's keys live in the document. Resolving `global.localStorage` per call
+     would make the backend read and write through the game's own view of this
+     document, i.e. recurse into itself on every access, which is a loop rather
+     than a save. Capturing at load also means the order of the page's own
+     scripts cannot change where the document ends up. */
+  var hostStore = (function () {
+    try { return global.localStorage || null; } catch (e) { return null; }
+  })();
+
+  function hostStorage() {
+    if (hostStore) return hostStore;
+    /* Only if the first capture failed — a browser that throws on the getter
+       before a document exists will not throw later. */
+    try { return global.localStorage || null; } catch (e) { return null; }
+  }
+
   function localStorageBackend(key) {
     return {
       read: function () {
-        try { return global.localStorage.getItem(key); } catch (e) { return null; }
+        var s = hostStorage();
+        try { return s ? s.getItem(key) : null; } catch (e) { return null; }
       },
       write: function (text) {
-        try { global.localStorage.setItem(key, text); } catch (e) {}
+        var s = hostStorage();
+        try { if (s) s.setItem(key, text); } catch (e) {}
       },
       clear: function () {
-        try { global.localStorage.removeItem(key); } catch (e) {}
+        var s = hostStorage();
+        try { if (s) s.removeItem(key); } catch (e) {}
       }
     };
   }
