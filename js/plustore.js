@@ -548,6 +548,69 @@
   var viewCache = null;    // { files: name -> text, stores: name -> entries }
   var viewCacheDoc = null; // the document that cache was built from
 
+  /* ── One Web Storage area, over the @file blocks ──────────────────────────
+
+     Cookie Clicker keeps its whole save in localStorage: one key per save
+     slot, one for the language, and a clear() that wipes them. The engine
+     never calls anything else, so rather than editing twenty call sites
+     inside a 1.2 MB game file, the area itself is swapped out before the
+     game loads. Every key becomes an @file block, still text.
+
+     The four methods are the whole of what a Storage area offers a game
+     that saves this way, plus key()/length for the ones that enumerate.
+     Names are sorted so the same save always serialises to the same bytes,
+     and `length` is a getter rather than a number, because a copy of a count
+     goes stale the moment the game writes.
+  ─────────────────────────────────────────────────────────────────────────── */
+
+  function webStorageArea() {
+    var area = {
+      getItem: function (key) {
+        var map = view().files;
+        var k = fileKey(key);
+        return map.hasOwnProperty(k) ? map[k] : null;
+      },
+
+      setItem: function (key, value) {
+        var v = view();
+        v.files[fileKey(key)] = value === undefined || value === null ? '' : String(value);
+        stats.fileWrites++;
+        writeView(v);
+      },
+
+      removeItem: function (key) {
+        var v = view();
+        delete v.files[fileKey(key)];
+        stats.fileWrites++;
+        writeView(v);
+      },
+
+      /* clear() empties this area, i.e. the @file blocks. A Unity save living
+         in the same document as @unity-prefs blocks is a different area and
+         keeps its own; nothing else in the document is touched. */
+      clear: function () {
+        var v = view();
+        var names = fileNames(v.files);
+        for (var i = 0; i < names.length; i++) delete v.files[names[i]];
+        stats.fileWrites++;
+        writeView(v);
+      },
+
+      key: function (index) {
+        var names = fileNames(view().files);
+        var i = Number(index) | 0;
+        return i >= 0 && i < names.length ? names[i] : null;
+      }
+    };
+
+    Object.defineProperty(area, 'length', {
+      get: function () { return fileNames(view().files).length; },
+      enumerable: true
+    });
+
+    return area;
+  }
+
   /* The name a host hands over may carry its own storage prefix. Strip it once
      here, so every caller — the runner's file layer and the extension helper
      alike — ends up in the same namespace in the document. */
@@ -1089,6 +1152,43 @@
           IsUsingFallback: function () { return false; }
         };
       }
+    },
+
+    /* ── Web Storage areas — for engines whose save is localStorage ────────
+
+         PluStore.installWebStorage();          // in the page, before the game
+         localStorage.setItem('CookieClickerGame', save);
+
+       installWebStorage() replaces window.localStorage with an area over this
+       document, so a game that saves through it — including one that calls
+       localStorage directly instead of through its own helper — cannot reach
+       the browser's store at all. It returns the installed area, or null when
+       the browser refused the swap, which is the one case a caller has to know
+       about: a game writing to the real localStorage would look like it saved
+       while the document stayed empty.
+
+       webStorage() is the same object without installing it, for a page that
+       would rather hand one to a single script than replace the global.
+    */
+    webStorage: function () {
+      return webStorageArea();
+    },
+
+    installWebStorage: function () {
+      var area = webStorageArea();
+      try {
+        Object.defineProperty(global, 'localStorage', {
+          value: area, configurable: true, enumerable: true
+        });
+      } catch (e) {
+        warn('could not replace window.localStorage: ' + e);
+        return null;
+      }
+      if (global.localStorage !== area) {
+        warn('window.localStorage could not be replaced; the save would not be ours');
+        return null;
+      }
+      return area;
     },
 
     /* ── Unity hooks — called from the patched player, not by the page ──── */
