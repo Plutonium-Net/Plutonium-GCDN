@@ -591,8 +591,22 @@
      moment the game writes.
   ─────────────────────────────────────────────────────────────────────────── */
 
-  function webStorageArea() {
+  function webStorageArea(mapper) {
     var area = {};
+
+    /* Every name a caller hands over goes through toKey, and every name handed
+       back through fromKey, so an engine whose key space carries the host it
+       was served from can still end up in the document under a name that does
+       not move with it. installSharedObjects() is the caller that needs this;
+       without a mapper both are the identity and nothing here changes. */
+    function toKey(name) {
+      var k = fileKey(name);
+      return mapper ? mapper.to(k) : k;
+    }
+
+    function fromKey(name) {
+      return mapper ? mapper.from(name) : name;
+    }
 
     /* The methods are defined non-enumerable, the way a real Storage has them
        on its prototype rather than as data: Object.keys(localStorage) on a
@@ -608,20 +622,20 @@
 
     method('getItem', function (key) {
       var map = view().files;
-      var k = fileKey(key);
+      var k = toKey(key);
       return map.hasOwnProperty(k) ? map[k] : null;
     });
 
     method('setItem', function (key, value) {
       var v = view();
-      v.files[fileKey(key)] = value === undefined || value === null ? '' : String(value);
+      v.files[toKey(key)] = value === undefined || value === null ? '' : String(value);
       stats.fileWrites++;
       writeView(v);
     });
 
     method('removeItem', function (key) {
       var v = view();
-      delete v.files[fileKey(key)];
+      delete v.files[toKey(key)];
       stats.fileWrites++;
       writeView(v);
     });
@@ -640,7 +654,7 @@
     method('key', function (index) {
       var names = fileNames(view().files);
       var i = Number(index) | 0;
-      return i >= 0 && i < names.length ? names[i] : null;
+      return i >= 0 && i < names.length ? fromKey(names[i]) : null;
     });
 
     /* length is a getter, like a real Storage's: a number copied out once would
@@ -681,7 +695,7 @@
       get: function (target, prop) {
         if (typeof prop === 'symbol' || prop in target) return target[prop];
         var map = view().files;
-        var k = fileKey(prop);
+        var k = toKey(prop);
         return hasKey(map, k) ? map[k] : undefined;
       },
 
@@ -692,7 +706,7 @@
       },
 
       has: function (target, prop) {
-        return prop in target || hasKey(view().files, fileKey(prop));
+        return prop in target || hasKey(view().files, toKey(prop));
       },
 
       deleteProperty: function (target, prop) {
@@ -708,7 +722,8 @@
         var out = Object.getOwnPropertyNames(target);
         var names = fileNames(view().files);
         for (var i = 0; i < names.length; i++) {
-          if (out.indexOf(names[i]) < 0) out.push(names[i]);
+          var name = fromKey(names[i]);
+          if (out.indexOf(name) < 0) out.push(name);
         }
         return out;
       },
@@ -718,13 +733,34 @@
         if (d) return d;
         if (typeof prop === 'symbol') return undefined;
         var map = view().files;
-        var k = fileKey(prop);
+        var k = toKey(prop);
         if (!hasKey(map, k)) return undefined;
         /* Configurable, because the target does not own this property: a
            proxy may not report an undeclared key as non-configurable. */
         return { value: map[k], writable: true, enumerable: true, configurable: true };
       }
     });
+  }
+
+  /* Put one area in the page as window.localStorage, and prove it landed. A
+     browser that refuses the swap is the one case a caller has to know about:
+     the game would write to the browser's own store, look like it saved, and
+     leave the document empty. */
+  function installArea(area) {
+    if (!global) return null;
+    try {
+      Object.defineProperty(global, 'localStorage', {
+        value: area, configurable: true, enumerable: true
+      });
+    } catch (e) {
+      warn('could not replace window.localStorage: ' + e);
+      return null;
+    }
+    if (global.localStorage !== area) {
+      warn('window.localStorage could not be replaced; the save would not be ours');
+      return null;
+    }
+    return area;
   }
 
   /* The name a host hands over may carry its own storage prefix. Strip it once
@@ -1324,20 +1360,56 @@
     },
 
     installWebStorage: function () {
-      var area = webStorageArea();
-      try {
-        Object.defineProperty(global, 'localStorage', {
-          value: area, configurable: true, enumerable: true
-        });
-      } catch (e) {
-        warn('could not replace window.localStorage: ' + e);
-        return null;
+      return installArea(webStorageArea());
+    },
+
+    /* ── Flash saves — Ruffle's SharedObjects ──────────────────────────────
+
+         PluStore.installSharedObjects('duck-life.swf');   // before ruffle.min.js
+
+       Ruffle writes every SharedObject through window.localStorage, so a Flash
+       game is a Web Storage game and the area above is all that is needed —
+       with one wrinkle that is Ruffle's rather than the browser's. It names the
+       slot after the movie's own URL, in Flash's own shape:
+
+         <domain><path>/<movie>.swf/<name>
+
+       Served from http://127.0.0.1:8332/games/duck-life/, Duck Life's save sits
+       under "127.0.0.1/games/duck-life/duck-life.swf/mydata"; the same folder
+       opened as http://localhost:8332/ asks for "localhost/games/..." instead
+       — a different key for the same save, which reads as progress that
+       vanished when only the address changed. (The port is not part of it,
+       the host is.)
+
+       Naming the movie narrows the key to the two parts that identify the save
+       — the movie file and the object — so the document holds
+       "duck-life.swf/mydata" whatever the page is served from. The mapper only
+       ever sees keys: a SharedObject name is separate from the movie's data
+       path, so nothing inside the save is rewritten by this.
+
+       Returns the installed area, or null if the browser refused the swap, the
+       same contract as installWebStorage().
+    */
+    installSharedObjects: function (movie) {
+      var tail = String(movie) + '/';
+
+      /* Ruffle's own spelling of a name, rebuilt from where this page is
+         served. It is only needed to answer a caller that enumerates the key
+         space — key(i), Object.keys(localStorage) — which Ruffle itself does
+         not: it composes the one key it wants and reads that. */
+      function hostSpelling(name) {
+        if (!global || !global.location || name.indexOf(tail) !== 0) return name;
+        var dir = String(global.location.pathname || '').replace(/[^/]*$/, '');
+        return String(global.location.hostname || '') + dir + name;
       }
-      if (global.localStorage !== area) {
-        warn('window.localStorage could not be replaced; the save would not be ours');
-        return null;
-      }
-      return area;
+
+      return installArea(webStorageArea({
+        to: function (name) {
+          var at = name.lastIndexOf(tail);
+          return at < 0 ? name : name.slice(at);
+        },
+        from: hostSpelling
+      }));
     },
 
     /* ── Unity hooks — called from the patched player, not by the page ──── */
