@@ -11,10 +11,42 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <link rel="stylesheet" href="webapp/fancade.css">
-  <link rel="icon" href="webapp/favicon.ico">
+  <!-- The page used to <link rel="icon" href="webapp/favicon.ico"> and the host
+       never had that file — a 404 on every load, upstream included. There is no
+       icon to point at, so the link is gone rather than aimed at nothing. -->
 
-  <!-- POKI SDK -->
-  <script src="//game-cdn.poki.com/scripts/v2/poki-sdk.js" ></script>
+  <!-- The save. Fancade's web player persists through its own `Storage` layer,
+       which is localStorage: one base64 blob per path, keyed
+       "com.martinmagni.drivemad/data/<path>", plus a bare "startup-time" flag.
+       Swapping the area before the player loads is what puts all of it in the
+       document — see js/plustore.js and STORAGE.md section 13.
+
+       No `filePrefix` here, deliberately. Storage.sync() — the one call that
+       hands the browser's stored files to the player at boot — walks
+       localStorage.key(i) and skips every key that does not start with
+       Storage.PREFIX:
+
+         if (key === null || !key.startsWith(Storage.PREFIX)) continue;
+
+       Stripping the prefix in the area hides every key from that loop, and the
+       player is booted with no database at all: the game then reports that it
+       could not load its progress, however healthy the document looks. So the
+       area keeps the player's own key space, and the document is keyed by the
+       same names the player looks for. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'drive-mad' });
+    var storage = PluStore.installWebStorage();
+    if (!storage) {
+      console.error('Drive Mad: window.localStorage could not be swapped — ' +
+        'the save would go to the browser store instead of the document');
+    }
+  </script>
+
+  <!-- The Poki SDK, which this build cannot start without, answered locally.
+       poki-local.js explains what it replaces and why vendoring the published
+       poki-sdk.js would have vendored a network call. -->
+  <script src="poki-local.js"></script>
 </head>
 
 <body id="body">
@@ -28,7 +60,7 @@
     </div>
   </div>
 
-  <!-- 
+  <!--
       Game canvas and overlay. Emscripten makes some assumptions about how the canvas is positioned in order
       to translate document to game coordinates
     -->
@@ -55,10 +87,10 @@
   </div>
 
   <!-- Manual JS, Called from WASM -->
-  <script type="text/javascript" src="webapp/source_min.js" crossorigin="anonymous"></script>
+  <script type="text/javascript" src="webapp/source_min.js"></script>
 
   <!-- Auto generated JS -->
-  <script type="text/javascript" src="webapp/index.js" crossorigin="anonymous"></script>
+  <script type="text/javascript" src="webapp/index.js"></script>
 </body>
 
 </html>

@@ -824,6 +824,35 @@
     return -1;
   }
 
+  /* The spellings a hosted block's name has inside the mounted filesystem.
+
+     Fancade's player keeps its save in localStorage under the key
+     "sandbox/db", and the player's own filesystem is mounted at /sandbox, so
+     the very same save is also the file /sandbox/db. A flush reads the tree
+     (paths) and carries the hosted blocks (names) into one document, which put
+     the save in twice — once as `@file sandbox/db` and once as
+     `@file /sandbox/db` — and it stayed doubled from then on, because the next
+     boot seeded the tree from the document and the flush after that wrote both
+     spellings out again.
+
+     They are one file, so the tree copy is dropped when a hosted block already
+     carries the name. Anything else the engine writes into the mount — the
+     file that is only a file, with no hosted key behind it — is untouched. */
+  function hostedSpellings(hosted, mount) {
+    var set = {};
+    for (var i = 0; i < hosted.length; i++) {
+      var name = String(hosted[i].path);
+      set[name] = true;
+      /* The name as a path in the filesystem: a hosted block is written back
+         with its name as given, which the player resolves against its root, so
+         "sandbox/db" and "/sandbox/db" are the one file /sandbox/db. */
+      set['/' + name.replace(/^\/+/, '')] = true;
+      /* And under the mount, for a host whose blocks are named relative to it. */
+      set[pathJoin(mount, name.replace(/^\/+/, ''))] = true;
+    }
+    return set;
+  }
+
   /* A Unity flush rewrites the whole document out of /idbfs, which knows
      nothing about hosted blocks. They are carried across instead of dropped. */
   function carriedHostedBlocks() {
@@ -1337,9 +1366,15 @@
        when something actually changed. */
     flush: function (FS, mount) {
       try {
-        var tree = readTree(FS, mount || cfg.mount);
+        var mountPoint = mount || cfg.mount;
+        var tree = readTree(FS, mountPoint);
         if (!tree.files.length) return;
-        tree.files = tree.files.concat(carriedHostedBlocks());
+        var hosted = carriedHostedBlocks();
+        if (hosted.length) {
+          var already = hostedSpellings(hosted, mountPoint);
+          tree.files = tree.files.filter(function (f) { return !already[f.path]; });
+        }
+        tree.files = tree.files.concat(hosted);
         var doc = serialize(tree, new Date().toISOString());
         stats.flushed++;
         if (doc === lastDoc) return;

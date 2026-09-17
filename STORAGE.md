@@ -8,7 +8,7 @@ The reference implementation and working example is `snow-rider-3d`. Read
 `games/snow-rider-3d/index.html` alongside this document.
 
 - Engine: [`js/plustore.js`](js/plustore.js)
-- Inspector page: [`games/snow-rider-3d/storage.html`](games/snow-rider-3d/storage.html)
+- Reading a save: [section 15](#15-inspecting-a-save)
 
 ---
 
@@ -18,7 +18,7 @@ The reference implementation and working example is `snow-rider-3d`. Read
 |---|---|---|
 | Format | opaque binary / engine internals | readable text |
 | Where | one IndexedDB database per engine, shared by every game on the origin | one backend you choose, one document per game |
-| Debugging | needs a devtools deep dive | read the document, or open the inspector page |
+| Debugging | needs a devtools deep dive | read the document, in a console or a browser's own devtools |
 | Backup | not practical | copy a string |
 | Editing | not practical | edit the text, reload, done |
 
@@ -133,6 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
+| Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
 returns a document, one that takes a document and rebuilds the engine's save.
@@ -209,8 +210,9 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — thirteen games are on PluStore
-   so far, and 21 in this repo still load that bridge.
+   `<script src="../../js/sync.js"></script>` — fifteen games are on PluStore
+   so far, and 19 of the 35 in this repo still load that bridge (`tiny-fishing`
+   loads neither, so it saves nothing at all yet).
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -223,7 +225,7 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 13](#13-verifying-a-conversion).
+   count in [section 14](#14-verifying-a-conversion).
 
 ---
 
@@ -364,8 +366,7 @@ records the real paths it found.
 ### 6.5 Applying an imported save
 
 Restoring happens at boot only, so an import is two steps — `PluStore.set(doc)`
-and then reload the frame. `games/snow-rider-3d/storage.html` does exactly this
-and is the model to copy for another game.
+and then reload the frame ([section 15](#15-inspecting-a-save)).
 
 Both steps have to be inside the reload, because the running player is a writer:
 its sync tick serialises its own in-memory tree over whatever is in the backend
@@ -839,7 +840,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 13](#13-verifying-a-conversion)).
+what the game asks for ([section 14](#14-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -861,19 +862,20 @@ produces a save that reads back as the wrong type — the same class of failure 
 storing binary as UTF-8. Everything the codec accepts comes back out of
 `getItem` exactly as it went in.
 
-### 8.8 The storage inspector
+### 8.8 What the document holds
 
-`games/big-flappy-tower-tiny-square/storage.html` frames the game beside a live
-panel: one table per store (key, type, decoded value), the decoded value of the
-selected key, and the raw document, with Copy, Export `.txt`, Import, Reload and
-Reset. Both known store names are listed before the game has written anything, so
-an empty store and a missing one do not look identical.
-`games/big-tower-tiny-square-2/storage.html` is the same panel, and is one place
-where a shared project id shows up: three EO Interactive titles — Big FLAPPY,
-Big Tower Tiny Square 2 and Big NEON Tower — carry the same Construct project id
-`ldz28jk2uv2f`, so all three panels list the same store names. Nothing mixes,
-because each game keeps its own document under `plu:text:<game>`; the documents
-are what the panel labels with the slot key at the top.
+One `@store` block per store, one line per key: `c3-localstorage-<project id>`
+carries the LocalStorage plugin's keys and `c3-savegames-<project id>` the save
+slots. `PluStore.stores.names()` and `PluStore.stores.entries(name)` read them
+back decoded, which is how the key names in
+[section 8.6](#86-what-the-game-then-does-through-it) were found
+([section 15](#15-inspecting-a-save)).
+
+The project id is the one place a shared id shows up: three EO Interactive titles
+— Big FLAPPY, Big Tower Tiny Square 2 and Big NEON Tower — carry the same
+Construct project id `ldz28jk2uv2f`, so all three documents list the same store
+names. Nothing mixes, because each game keeps its own document under
+`plu:text:<game>`.
 
 ---
 
@@ -978,8 +980,8 @@ fallbacks, which become `self.PluStore && self.PluStore.stores ? "" : localStora
 so the old store is never read. No event in this build drives them — the slot
 name comes from actions the export does not contain — but a dormant path that
 still reads the old store is a save that silently disagrees with itself the day
-a build does use it. Patch it, and list it in the inspector as a store that
-exists but holds nothing.
+a build does use it. Patch it, so a dormant path cannot read a store the document
+does not own.
 
 **If the export bundles a real localforage**, which C2 does whenever the
 WebStorage plugin is present, then `stores.localforage()` must answer the same
@@ -1330,21 +1332,18 @@ Two console lines are worth recognising and ignoring:
 - **`SampleNode._pause … reading 'currentTime'`.** An audio exception in this
   build when the AudioContext is still suspended; unrelated to storage.
 
-### 10.6 The storage inspector
+### 10.6 Reading the two Godot saves
 
-`games/buckshot-roulette/storage.html`: the mounted `user://` tree (path, kind,
-size), a decoded view of the selected file — text inline, binary as a byte count
-and a hex head — and the raw document with the same Copy / Export / Import /
-Reload / Reset row every other panel has. It was verified against the game's real
-options save, which decodes as `4344 bytes` starting `f4 10 00 00 …` with
-`setting_volume` legible in it.
+Both decode without tooling. Buckshot Roulette's is binary —
+`user://buckshotroulette_options_12.shell` arrives as a `@base64` block and starts
+`f4 10 00 00 …`, with `setting_volume` legible inside it. Crazy Cattle 3D's is a
+text resource, `user://crazysavefile.tres`, so its `name = value` fields are in
+plain sight ([section 15](#15-inspecting-a-save)).
 
-`games/crazy-cattle-3d/storage.html` is the same panel for the second Godot game,
-with two differences. It lists `@dir` blocks as a count instead of as rows,
-because a first run drops thirty shader-cache directories into the document and a
-list of hashes is not a save anyone reads. And it decodes a `.tres` into the
-`name = value` fields the game itself wrote, which is the whole of what a text
-resource needs.
+Two things a reader has to expect on a first run. The engine drops its own
+shader-cache directories into the document, so counting `@dir` blocks is easier
+than listing hashes. And whether a save can be edited as fields depends on the
+file: a `.tres` resource and a `ConfigFile` are text, a `.shell` is bytes.
 
 ### 10.7 Localising a split export
 
@@ -1438,7 +1437,7 @@ reading it back is the same read. Both are real ways to use a Storage area and
 some games only ever use the second ([section 11.6](#116-the-second-surface-localstoragekey)).
 
 The area's keys ride in the same document as `@file` blocks, one block per key,
-so the save is readable text in the inspector like every other conversion. The
+so the save is readable text in the document like every other conversion. The
 methods are defined non-enumerable, the way a real Storage has them on its
 prototype, so `Object.keys(localStorage)` inside the game lists the game's own
 keys and not the five method names.
@@ -1477,9 +1476,10 @@ a game that swaps its own storage cannot take the document with it.
 | `CookieClickerGameBeta` | the same key for the beta version; `Game.beta` is 0 in this build, so it stays empty |
 | `CookieClickerLang` | the language code the game last loaded (`EN`), which is why a fresh save shows the language picker |
 
-The save is base64, so a reader cannot tell progress from the document alone —
-that is what the inspector's decode is for, and it is why the inspector also
-reads the live game's own numbers out of the frame instead of re-deriving them.
+The save is base64, so a reader cannot tell progress from the document alone; the
+game's own `base64.js` turns it back into its pipe-separated fields, and the
+cookie count on the screen is the game's own answer for the rest
+([section 15](#15-inspecting-a-save)).
 
 **Core Ball**, the other Web Storage engine here, keeps exactly one key:
 
@@ -1604,7 +1604,7 @@ the published `ytgame.js`:
 
 - `IN_PLAYABLES_ENV` is `window !== window.parent`. Not a capability check, not a
   handshake — *being in a frame at all*. A top-level tab is "not Playables"; any
-  frame, the storage inspector included, is.
+  frame at all is.
 - Every data method is gated on it. Top-level, `loadData()` resolves `""` and
   `saveData()` does nothing, so a game's save goes in the bin with no error
   anywhere. Framed, the same calls post a message to a parent that is not there
@@ -1725,17 +1725,18 @@ Both are worth knowing before you trust a console on any of these games:
   holds. A host SDK's `saveData` replaces too, so the same fragility is on the
   real platform; nothing here introduces it.
 
-### 12.7 The storage inspector
+### 12.7 Reading the blob
 
-`games/crossy-road/storage.html` puts the game beside a table of its thirteen
-fields, each row showing the stored value *and* the value the frame holds right
-now, so a field that has not been read or written back yet is visible rather than
-implied. Until the bulk loader was enabled every row would have shown exactly
-that. Plus the raw document with Copy, Export `.txt`, Import, Reload and Reset.
+The save is one `@file ytgameGameData` block, and the JSON inside it is the
+game's whole state: thirteen fields, `topScore`, `coins`, `unlockedCharacters`
+and `currCharacter` among them. Parsing it is the fastest way to see a field the
+game has not read or written back yet, which is also why a save that is written
+whole can look perfectly healthy while the game is writing defaults over it
+([section 12.3](#123-the-trap-the-games-own-load-path-may-be-dead-code)).
 
 ### 12.8 Verifying a Playables conversion
 
-The generic five steps in [section 13](#13-verifying-a-conversion) all apply. This
+The generic five steps in [section 14](#14-verifying-a-conversion) all apply. This
 game adds two that are specific to a host SDK, and both are cheap:
 
 1. **Count the reads and the writes, in order.** The save is written whole, so a
@@ -1760,7 +1761,226 @@ store.
 
 ---
 
-## 13. Verifying a conversion
+## 13. Fancade (Poki)
+
+`games/drive-mad/` — a Fancade web player, wrapped for Poki. Two things make it
+different from every conversion before it: the save and the player's own
+filesystem hold the same bytes under two spellings, and the page would not run at
+all until something in it was *removed*.
+
+### 13.1 The engine's own storage, in two layers
+
+The player keeps its database in `localStorage`, one base64 blob per path:
+
+    com.martinmagni.drivemad/data/sandbox/db        the save
+    com.martinmagni.drivemad/data/sandbox/db.bak    the player's backup
+    com.martinmagni.drivemad/data/sandbox/db.lod    and its second
+    com.martinmagni.drivemad/version                "this database was migrated"
+    startup-time                                    which tab loaded last
+
+`webapp/source_min.js` is that whole layer. `Storage.init(path_max)` runs
+`migrate0()`, then `sync()` — which walks those keys and pushes every path into
+the player through `_storage_write` — then writes the version stamp.
+`Storage.write` and `Storage.remove` go back out through `setItem` / `removeItem`.
+Every call is already `localStorage`, so this half is a Web Storage conversion
+([section 11](#11-web-storage-localstorage)) and the page installs the area before
+the player loads:
+
+    PluStore.configure({ game: 'drive-mad', filePrefix: 'com.martinmagni.drivemad/data/' });
+    var storage = PluStore.installWebStorage();
+
+`filePrefix` is what makes the document readable. The prefix is bookkeeping, so it
+is stripped on the way in and the blocks are named the game's own paths
+(`sandbox/db`). The two keys that do *not* carry it — the version stamp and
+`startup-time` — keep their full names, which is the honest thing to show: the
+player looks them up by those names, and they are not the save.
+
+The second layer is the player's own filesystem. The build mounts a filesystem at
+`/sandbox` and seeds it before `app_init`, which is why a converted Drive Mad keeps
+its progress as a *key* (`sandbox/db`, through the area) and a *file*
+(`/sandbox/db`, through the mount) — the same bytes, twice, and a flush has to know
+they are one file ([section 13.4](#134-a-block-and-its-file-are-one-file)).
+
+### 13.2 Load PluStore before the player
+
+`games/drive-mad/index.html` is small: PluStore and its configuration, the local
+Poki stand-in, then the player's own two scripts. The page that shipped was a
+wrapper — its assets came from a jsDelivr folder and its SDK from a Poki CDN — so
+localising it was part of the job, and the copy was taken from the host the wrapper
+itself pointed at (the Poki package URL recorded in the wrapper's own shim) with
+every file verified against its content hash.
+
+    <script src="../../js/plustore.js"></script>
+    <script>
+      PluStore.configure({ game: 'drive-mad', filePrefix: 'com.martinmagni.drivemad/data/' });
+      var storage = PluStore.installWebStorage();
+      if (!storage) { console.error(...); }
+    </script>
+    <script src="poki-local.js"></script>
+    ...
+    <script type="text/javascript" src="webapp/source_min.js"></script>
+    <script type="text/javascript" src="webapp/index.js"></script>
+
+The `webapp/` folder is otherwise stock: `index.js` (the wasm glue),
+`index.wasm`, `index.data` (the player's assets), `source_min.js` (the shell),
+`fancade.css`, `cover.jpg`, `baloo2.woff`. All of them are local; a full boot makes
+no request that is not `127.0.0.1`, and the only 404 is the browser's own probe for
+a favicon the page does not have.
+
+### 13.3 The three sites, and the callback that must actually run
+
+This build's glue is *unminified*, which makes the three sites easy to find and
+easy to get subtly wrong. They are three entries in the player's command table,
+the same table that carries `hideOverlay()`, the audio calls and the storage
+verbs:
+
+| Command | Was | Is |
+|---|---|---|
+| mount + `app_init` | `FS.mkdir("/sandbox"); FS.mount(IDBFS, {}, "/sandbox"); FS.syncfs(true, cb)` with `app_init()` and `hideOverlay()` in `cb` | `FS.mkdir; FS.mount(MEMFS, {}, "/sandbox"); PluStore.boot(FS, "/sandbox");` then `app_init()` and `hideOverlay()` directly |
+| sync to storage | `FS.syncfs(false, cb)`, `fsSyncStatus` cleared in `cb` | `PluStore.flush(FS, "/sandbox")`, guard cleared in the same tick |
+| sync from storage | `FS.syncfs(true, cb)`, same guard | `PluStore.boot(FS, "/sandbox")`, same guard |
+
+The trap is the callback. `FS.syncfs` takes one; `PluStore.boot` and
+`PluStore.flush` are synchronous and take none — so a conversion that replaces the
+call and leaves the callback behind produces a parenthesised function expression
+that nothing invokes:
+
+    PluStore.boot(FS, "/sandbox");(function (err) { ... app_init(); hideOverlay(); })
+
+The mount happens, the tree is seeded, and then the game sits on its loading screen
+for ever: `app_init` is never called, `Module._get_app_inited()` stays 0, and
+nothing throws, which is what makes it worth calling out. The same shape did worse
+to the two sync commands, where the guard is cleared *inside* the old callback: it
+stayed set for the life of the page, so every later sync request was refused
+without a word.
+
+Both callbacks' bodies now run directly, and the guard clears in the same tick as
+the operation it guards. Nothing is lost by that: with a synchronous backend there
+is no window in which a second sync could overlap the first, which is the only
+thing that guard was ever for.
+
+### 13.4 A block and its file are one file
+
+`readTree()` names a file by its path (`/sandbox/db`); a hosted block is named by
+the engine's own key (`sandbox/db`); `restoreTree()` writes a block's name as a
+path, resolved against the player's root. So for this engine the two spellings land
+on the same file:
+
+    @file sandbox/db      the save, as the player's localStorage key
+    @file /sandbox/db     the same save, as a path in the mount
+
+A flush reads the mount and carries the hosted blocks into one document, so it
+wrote the save twice — and once written, the next boot seeded the mount from both
+blocks and the flush after that wrote both again. The document merely looked
+bigger; nothing was lost, but the save was in it twice for good, and a listing
+showed two rows for one file.
+
+`flush()` now drops a tree file whose mounted path a hosted block already names
+([section 17](#17-reference) for the API). It is the same file, so nothing needs
+carrying twice: the block restores the path at the next boot, and a tree file with
+no hosted block behind it — the file that is only a file — is still written. For an
+engine with no hosted blocks at all, which is every Unity and Godot conversion, the
+new filter has nothing to drop and behaves exactly as before.
+
+### 13.5 The Poki SDK — and the sitelock that had to go
+
+The build cannot start without a Poki SDK. Its boot is
+`PokiSDK.init().then(setPokiInited)`, `setPokiInited` calls `gameLoadingStart()`
+unguarded, and the game only starts once `PokiSDK.commercialBreak()` resolves —
+which is also what `adInterstitialShow()` uses, so an SDK that never resolves that
+promise holds the loading screen for ever.
+
+`games/drive-mad/poki-local.js` is the stand-in, and it is exactly the surface the
+build reaches for: `init`, `gameLoadingStart`, `gameLoadingFinished`,
+`gameplayStart`, `gameplayStop`, `commercialBreak`, `rewardedBreak` — seven
+members, checked against every `PokiSDK.` reference in the build.
+`commercialBreak()` resolves at once (there is no ad to watch, and refusing to
+resolve would freeze the boot); `rewardedBreak()` resolves `false`, the same answer
+the real SDK gives when it cannot fill an ad. Vendoring the published
+`poki-sdk.js` would not have been localisation: it is a loader that injects
+`https://game-cdn.poki.com/scripts/<version>/poki-sdk-<device>.js` at run time.
+
+The name that matters more is `pokiSendLevelData()`, whose body used to post a
+beacon to `leveldata.poki.io` on every level completion; it is a refusal now, the
+same treatment the other engines' score endpoints get.
+
+**The sitelock.** `initPokiSdk()` opened with an obfuscated IIFE, and an obfuscated
+IIFE in a build shell is worth decoding before it is trusted. Its strings are
+base64: `localhost`, `.poki-gdn.com`, `https://download.poki-gdn.com` and
+`https://poki.com/sitelock`. It read `window.location.hostname`, allowed
+`localhost` and any `*.poki-gdn.com` host, and otherwise navigated the page — and
+the top frame with it — to `https://poki.com/sitelock`, which answers with Poki's
+"game not available" page.
+
+Served from `127.0.0.1` that is exactly what happened: the game fetched its
+assets, booted its player, logged its own startup lines, and was then replaced by
+Poki's error page. The desktop preview had only *hidden* it, by cancelling the
+cross-origin navigation, which is the worst way for a fault to present — the
+conversion looked finished, and the two aborted requests were the clue. It is
+removed whole rather than answered locally: there is no response that means
+"allowed" short of the hostname check itself, and a check that protects Poki's
+catalogue from re-hosting has nothing to say about a folder on a player's own disk.
+
+### 13.6 What the player then does
+
+A cold boot, in order: the page installs the Web Storage area, `poki-local.js`
+answers `init()` and `commercialBreak()`, the player's `postRun` sets
+`postRunDone`, `tryStartGame()` finds all three flags and calls `startGame()` —
+which registers the listeners and tells the player the user has accepted. The
+player then asks JS for the mount, gets `PluStore.boot(FS, "/sandbox")`, calls
+`app_init()`, and hides the loading screen.
+
+Two writes are already in the document by then, and neither is the save:
+`Storage.init` writes the version stamp, and `set_latest_browser_tab` writes
+`startup-time` — both under names that do not carry the data prefix, so they appear
+in the document as themselves. `Storage.sync()` also reads every stored path and
+hands it to the player before the game draws anything.
+
+Then the game plays, and the save arrives: `Storage.put()` base64-encodes a
+database blob and calls `localStorage.setItem`, which the area turns into a block.
+The blob is **zlib-compressed JSON** — `{"v":6,"om":1,"os":1,"gc":{...}}` — so the
+document holds text, and the text is base64 of a compressed stream — so reading it
+means inflating it first ([section 15](#15-inspecting-a-save)).
+
+### 13.7 Applying a save from outside
+
+Changing this document from outside the player is two steps — write it, then start
+the player again — and the order matters, because the player is a writer: Fancade's
+shell flushes the whole mount when its page goes away, so clearing or replacing the
+document while an old player is still alive lets its dying flush put the old save
+straight back. Park the frame on `about:blank` (which unloads the player and lets it
+finish), change the document once it is gone, and only then start the game again
+([section 18](#18-known-limits)).
+
+The values that say whether any of it worked are the player's own:
+`Module._get_app_inited()`, and what the frame's `Storage.get(Storage.PREFIX, path)`
+answers for the path that was written ([section 13.8](#138-verifying-a-fancade-conversion)).
+
+### 13.8 Verifying a Fancade conversion
+
+The player is a wasm app with its own notion of "inited", and almost all of its
+state is inside the wasm, so the checks that work are the ones the player and the
+engine report about themselves:
+
+- `Module._get_app_inited()` — 0 means the mount or `app_init` never ran. This is
+  the single most useful value in this engine: the loading screen looks the same
+  whether the game is booting or dead.
+- `PluStore.stats()` — `booted` counts the mount's seed, `flushed` the writes back,
+  and `fileWrites` the game's own `setItem`s.
+- `Storage.get(Storage.PREFIX, path)` in the frame — the engine's own read path,
+  which decodes exactly what the document holds.
+- the area's keys, via `Object.keys(localStorage)` in the frame: they are the
+  document's blocks, so a game that "saved" without writing is visible as an empty
+  list.
+
+The read path is best proved by writing a file the game has never written. Inject
+`@file sandbox/probe-file` with `aGVsbG8=` — base64 for `hello` — reload, and ask
+the player for it: `Storage.get` answering `hello` is the document's value arriving
+through the engine's own code, with the engine's own backup files intact beside it.
+
+---
+
+## 14. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success. The engine-specific half of each step is
@@ -1874,53 +2094,58 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 14. Inspecting a save
+## 15. Inspecting a save
 
-Every converted game has one, and they take the shape the engine needs:
+There is nothing to install. The save is one plain-text string, and it is read
+through the same API that wrote it:
 
-- `games/snow-rider-3d/storage.html`, `10-minutes-till-dawn`, `backrooms-3d`,
-  `games/cluster-rush/storage.html` — the decoded PlayerPrefs table, the file
-  tree, and the raw document.
-- `games/bacon-may-die/storage.html` — the file list (name, type, size, first
-  line), a decoded view of the selected file (an `.ini` as key/value rows, a
-  `.json` pretty-printed), and the raw document.
-- `games/big-flappy-tower-tiny-square/storage.html` — one table per key/value
-  store (key, type, decoded value), the decoded value of the selected key, and
-  the raw document.
-- `games/big-tower-tiny-square-2/storage.html` — the store panel again, for a
-game whose two store names collide with Big FLAPPY Tower's.
-- `games/big-ice-tower-tiny-square/storage.html` — the store panel for a
-  Construct 2 build: one populated store named `localforage`, and a second
-  listed store (`_C2SaveStates`) that exists but holds nothing.
-- `games/buckshot-roulette/storage.html` — the file tree for a Godot build: the
-  mounted `user://` tree, the selected file decoded (text inline, binary as a
-  byte count and a hex head), and the raw document.
-- `games/cookie-clicker/storage.html` — the storage-key table for a
-  `localStorage` engine, the selected key decoded with the game's own
-  `base64.js` into its pipe-separated fields, the live game's cookies/bakery read
-  out of the frame, and the raw document.
-- `games/core-ball/storage.html` — the one-key table for a game that saves by
-  property, the selected key decoded as a level number, the frame's own
-  `GlobalLevel` and the label its begin screen draws from it, and the raw
-  document.
-- `games/crazy-cattle-3d/storage.html` — the Godot file panel again, with `@dir`
-  blocks counted rather than listed, the selected `.tres` decoded into the
-  `name = value` fields the game wrote, and the frame's own flush count.
-- `games/crossy-road/storage.html` — the field table for a host-SDK game: the
-  game's own thirteen save fields, each with the stored value beside the value the
-  frame holds right now, the frame's screen and score, and the keys the area it
-  holds actually contains.
+```js
+PluStore.get()                      // the whole document
+PluStore.list()                     // [{path, kind, keys}] — contents, without the bodies
+PluStore.parse(PluStore.get())      // {dirs, files} — the blocks themselves
+PluStore.prefs()                    // the first PlayerPrefs block, decoded
+PluStore.stores.names()             // the key/value stores the save holds
+PluStore.stores.entries('<name>')   // [{key, tag, value}] — one store, decoded
+PluStore.files.list()               // [{name, size}] for a flat file host
+PluStore.on(function (doc) { ... }) // every write, as it happens
+```
 
-All of them frame the game beside a live panel with Copy, Export `.txt`, Import,
-Reload and Reset, and all of them listen for the `postMessage` that every write
-broadcasts, so the panel updates as the game saves.
+Under the default backend that document lives in `localStorage` under
+`plu:text:<game>`, so a browser's own devtools read it as well (Application →
+Local Storage), and `PluStore.backends.<name>` decides where else it can live
+([section 16](#16-backends)).
 
-To reuse one for another game, copy the page and change two things: the iframe
-`src`, and the `PluStore.configure` call.
+What a block holds, by engine:
+
+| Engine | Block | The body |
+|---|---|---|
+| Unity | `@unity-prefs <path>` | decoded PlayerPrefs — name, type, value |
+| Unity, Godot, any filesystem | `@text` / `@base64` | one file verbatim, or one that is not UTF-8 as base64 |
+| GameMaker | `@file <name>` | one named file, escaped onto a single line |
+| Construct 3 and 2 | `@store <name>` | `key`, type tag, value — one escaped line per entry, sorted |
+| Web Storage, Playables, Fancade | `@file <name>` | one key of the area, as stored |
+
+Three decodes are worth doing by hand rather than reading raw:
+
+- **A `@base64` body.** Decode it and look at the bytes: a Godot `.tres` or
+  `.shell` is readable that way, and a `UnityPrf\0` header says a PlayerPrefs file
+  is there. A Fancade `sandbox/db` body is base64 *of a zlib stream*, so it needs
+  an inflate before it is JSON ([section 13.6](#136-what-the-player-then-does)).
+- **A `@store` entry.** The tag is the type, so a value that reads back as `"128"`
+  when the game stored `128` is a different save, not a formatting choice
+  ([section 8.7](#87-store-values-carry-a-type-tag)).
+- **A `@unity-prefs` block.** `PluStore.prefs()` decodes it, and the seven header
+  bytes are carried through untouched ([section 17](#17-reference)).
+
+The document only changes through `set()` ([section 2](#2-the-contract)), so an
+edit made by hand is inert until the page reloads — and for an engine whose flush
+runs on the way out, a live game can write its own tree back over the edit first
+([section 6.5](#65-applying-an-imported-save)). Stop the game, or pin its flush,
+before editing anything into a running page.
 
 ---
 
-## 15. Backends
+## 16. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -1941,7 +2166,7 @@ needs to change.
 
 ---
 
-## 16. Reference
+## 17. Reference
 
 ### API
 
@@ -1959,7 +2184,7 @@ needs to change.
 | `stores.instance(name)` | a localforage-shaped store: `getItem` / `setItem` / `removeItem` / `clear` / `keys`, all promise-returning |
 | `stores.localforage(name)` | the same store with node-style callbacks instead, for an engine written against the localforage global |
 | `stores.names()` | names of the stores the document holds, sorted |
-| `stores.entries(name)` | `[{key, tag, value}]`, decoded, for an inspector |
+| `stores.entries(name)` | `[{key, tag, value}]`, decoded |
 | `installWebStorage()` | replace the page's `localStorage` with an area over the document (method *and* property access), or `null` if the browser refused |
 | `webStorage()` | the same area without installing it |
 | `prefs()` | the first PlayerPrefs block, decoded |
@@ -2000,8 +2225,29 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 17. Known limits
+## 18. Known limits
 
+- **Fancade writes its mount back when its page goes away.** The player flushes the
+  whole of `/sandbox` on unload, so clearing or replacing the document while an old
+  player is still alive lets its dying flush put the old save straight back — park
+  the frame on `about:blank` first, wait, then write and restart
+  ([section 13.7](#137-applying-a-save-from-outside)). A Unity or Godot game has the
+  same hazard, since its flush runs on the way out too.
+- **A Fancade save is two things at once.** [Section 13.4](#134-a-block-and-its-file-are-one-file)
+  covers the doubling that `flush()` now avoids; the remaining asymmetry is that the key
+  and the file are restored by different routes at boot, so the mount always carries a
+  copy of the area rather than the other way round.
+- **A Fancade save is a compressed blob.** `sandbox/db` is zlib-compressed JSON as base64,
+  with two sibling backups the player maintains itself. Reading it means inflating it;
+  editing it means editing a stream, not fields.
+- **Two globals this build calls are defined nowhere in it.** The player's command table
+  reaches for `adInterstitialLoad()` and `adRewardedLoad()`, neither of which exists in any
+  file of the build — upstream's own dangling references, present before the conversion.
+  Play did not reach either call; if a later build does, it throws inside the player.
+- **The page's last 404 is the browser's own.** The published build linked
+  `webapp/favicon.ico`, which its own host answers 404, so the link is gone rather than
+  aimed at nothing, and the browser probes `/favicon.ico` instead: one 404 per load, from
+  the browser, for a page that declares no icon.
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
   wants chunking first.
@@ -2037,7 +2283,8 @@ is what makes a re-encode safe to hand back.
   games keep that is free; a game with a large save wants batching.
 - **GameMaker cannot list its own files.** HTML5 stubs `file_find_first` and the
   `directory_*` functions out, so no game code can enumerate the save through
-  `PluStore.files.list()`. That is an inspector-level view, not an engine one.
+  `PluStore.files.list()`. That is a view from outside the engine, not one the game
+  can reach.
 - **The runner patch is per-build.** The four bodies [section 7.2](#72-the-four-functions-that-are-the-whole-file-layer)
   replaces are minified and can change between GameMaker versions. They are
   small and greppable, but a re-export means re-checking them, the same way a
@@ -2101,16 +2348,14 @@ is what makes a re-encode safe to hand back.
   rewritten on a new high score, a flag, a gumball prize, a coin change and a
   sound toggle — nothing else. An edited field can therefore sit in the document
   out of step with the frame's memory until one of those happens, which is
-  information, not drift: the inspector shows both columns side by side for
-  exactly this reason.
+  information, not drift: the stored value and the frame's value are two different
+  things until the game writes again.
 - **A Playables game's leaderboard goes nowhere.** `engagement.sendScore()` is
   answered locally and says so once in the console. The score is kept in the save;
   the board is the host's and there is no host.
 - **`@file test` in a Web Storage game is not a save.** It is the game's own
   capability probe (`localStorage.setItem('test', 0)`), stored like any other
   write. Harmless, and worth not deleting: it is how you know the area swap took.
-- **The inspector is same-origin only.** The panel reads the backend directly,
-  so a cross-origin game frame would need the `postMessage` path only.
 
 ---
 
