@@ -1,4 +1,5 @@
-/* Each game's page, with one write through its installed area. (temporary) */
+/* Each game's page: does the area it installed (if any) and its files layer
+   both reach the stored document? (temporary) */
 import { launch, sleep } from './cdp.mjs';
 
 const GAMES = ['cookie-clicker', 'core-ball', 'bacon-may-die', 'drive-mad', 'duck-life'];
@@ -10,18 +11,26 @@ for (const game of GAMES) {
   try {
     await page.navigate('http://127.0.0.1:8332/games/' + game + '/index.html');
     await sleep(game === 'drive-mad' ? 20000 : 14000);
-    row.area = JSON.parse(await page.evaluate(`JSON.stringify((() => {
-      localStorage.setItem('smoke-probe', 'ok-' + ${JSON.stringify(game)});
-      const keys = []; for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-      const stored = PluStore.list().map((f) => f.path).filter((p) => p.indexOf('smoke-probe') >= 0);
+    row.probe = JSON.parse(await page.evaluate(`JSON.stringify((() => {
+      const hostStorage = Object.getPrototypeOf(localStorage).constructor.name === 'Object';
+      const docBefore = PluStore.get();
+      localStorage.setItem('smoke-probe', 'via-area');
+      const docAfterArea = PluStore.get();
+      PluStore.files.write('smoke-file', 'via-files');
+      const docAfterFiles = PluStore.get();
       const viaMethod = localStorage.getItem('smoke-probe');
       const viaProperty = localStorage['smoke-probe'];
       localStorage.removeItem('smoke-probe');
+      PluStore.files.remove('smoke-file');
+      const docAfterCleanup = PluStore.get();
       return {
-        storedAs: stored, viaMethod, viaProperty,
-        enumerated: keys.filter((k) => k.indexOf('smoke-probe') >= 0).length,
-        goneAfterRemove: localStorage.getItem('smoke-probe'),
-        stats: PluStore.stats()
+        areaIsOurs: hostStorage,
+        areaWriteReachedDocument: docAfterArea.indexOf('via-area') >= 0,
+        filesWriteReachedDocument: docAfterFiles.indexOf('via-files') >= 0,
+        viaMethod, viaProperty,
+        cleanupLeftNothing: docAfterCleanup.indexOf('smoke-') < 0,
+        docLenBefore: docBefore.length,
+        keys: PluStore.list().map((f) => f.path)
       };
     })())`));
   } catch (e) {
