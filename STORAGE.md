@@ -133,7 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
-| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/) and [section 14](#14-flash-ruffle) |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,9 +211,11 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — fifteen games are on PluStore
-   so far, and 18 of the 34 in this repo still load that bridge (`tiny-fishing`
-   loads neither, so it saves nothing at all yet).
+   `<script src="../../js/sync.js"></script>` — sixteen games are on PluStore
+   so far, and 17 of the 34 in this repo still load that bridge as a script tag
+   (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
+   tags, not mentions: a converted page may still say `js/sync.js` in a comment
+   explaining what it replaced.
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -2064,11 +2066,13 @@ stripped prefix.
 
 ## 14. Flash (Ruffle)
 
-`games/duck-life/` is a Mochi-era Flash build: one `duck-life.swf` played by
-Ruffle, a WASM Flash player. Nothing inside the movie is patched — this is the
-shortest conversion in the document — but two things about Ruffle are not
+`games/duck-life/` and `games/duck-life-2/` are Flash builds — one `.swf` each,
+played by Ruffle, a WASM Flash player. Nothing inside a movie is patched — this
+is the shortest conversion in the document — but two things about Ruffle are not
 obvious: the key its saves are named by, and the fact that its save is already
-`localStorage`.
+`localStorage`. The second game is written up alongside the first because it
+taught one thing the first could not ([section 14.9](#149-what-the-second-conversion-added)):
+a movie may not open its save at all until the player starts the game.
 
 ### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
 
@@ -2078,7 +2082,19 @@ Flash's save is a `SharedObject`: a movie calls
 
     stalvl  runlvl  flylvl  swilvl  seed  skill  money  colour  hat
 
-— and Ruffle keeps it in `localStorage`: its wasm carries
+— and Duck Life 2 keeps the same names and adds four more:
+
+    stalvl  runlvl  flylvl  swilvl  seed  skill  money  colour  hat
+    maxi  maxmaxi  clilvl  namee
+
+Both are `getLocal("mydata")`, so both land in the document under the *same*
+slot name and are kept apart by the movie part of the key only. That the second
+list is right is not inferred from the bytes: the movie's own constant pool
+spells out the property names (`.money.race.maxi.maxmaxi.colour.hat.namee`) and
+the line that writes them (`data.SharedObject.getLocal.data.maxmaxi.namee.flush`).
+Decompressed, a save and the code that produced it agree field for field.
+
+Ruffle keeps that object in `localStorage`: its wasm carries
 `ruffle_web::storage::LocalStorageBackend` and reaches the browser through
 `window.localStorage`. A Flash game is therefore a Web Storage game
 ([section 11](#11-web-storage-localstorage)) with one wrinkle, and the area swap
@@ -2099,7 +2115,7 @@ in [section 11.1](#111-repair-the-area-not-the-call-sites) is the whole job.
 and the movie is handed over as before:
 
 ```js
-player.load('duck-life.swf');
+player.load('duck-life.swf');   // duck-life-2: 'duck-life-2.swf'
 ```
 
 Order is not optional: Ruffle reads a movie's save as it loads it, so the area has
@@ -2130,15 +2146,27 @@ That the narrowing is real was measured rather than assumed. With it installed, 
 value written through a key composed for `127.0.0.1` reads back through the
 `localhost` spelling of the same key — one save, two hosts. The area also answers
 `key(i)` and `Object.keys()` in Ruffle's own spelling, so nothing that enumerates
-sees names it does not recognise.
+sees names it does not recognise. Instrumenting a second movie showed the same
+mapper at work on a different name, unchanged:
+
+    127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata      ← what Ruffle composes
+    duck-life-2.swf/mydata                                 ← what the document holds
 
 ### 14.4 The surface Ruffle uses is the property one
 
 Wrapping the installed area and logging every way into it showed Ruffle reaching
 the area as `localStorage[name]` — a property read and a property write — and
 never through `getItem`/`setItem`. It wrote the same bytes nine times during one
-boot: Ruffle flushes a SharedObject on a schedule of its own, so `fileWrites` in
-`PluStore.stats()` counts a boot, not a save the player made.
+boot, and six times on a second movie:
+
+    GET[127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata] -> undefined
+    SET[127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata] <- 224 chars
+    SET[127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata] <- 308 chars   (×5)
+
+Ruffle flushes a SharedObject on a schedule of its own, so `fileWrites` in
+`PluStore.stats()` counts a boot, not a save the player made. Note the shape of
+that log: one key, reached by property, read before written. A wrapper that logs
+`getItem`/`setItem` prints nothing at all and looks like a game that never saves.
 
 This is why [section 11.6](#116-the-second-surface-localstoragekey) exists. An
 area that answered only by method would leave Ruffle reading `undefined` and
@@ -2166,22 +2194,45 @@ string where a movie belongs and nothing ever started.
 
 ### 14.6 The calls that leave the machine, and the guard that stops them
 
-The movie carries MochiAds' preloader stub, which fetches
+Duck Life's movie carries MochiAds' preloader stub, which fetches
 `http://x.mochiads.com/srv/1/<id>.swf` and pings
-`http://mochibot.com/my/core.swf` every time the game is opened. Both URLs live
-*inside the SWF*, so there is nothing to delete in a script file — and both only
-ever failed anyway (a dead host sends no CORS headers), so refusing them changes
-nothing the movie does. The page refuses them in a `window.fetch` guard: same
-origin, `data:` and `blob:` pass; anything else is rejected with a warning, once
-per URL. Ruffle never uses `XMLHttpRequest` — its wasm contains no such string,
-and one `fetch_with_request` — so `window.fetch` is the whole surface.
+`http://mochibot.com/my/core.swf` every time the game is opened. Duck Life 2 has
+no Mochi stub but a longer list of the same kind: a CPMStar ad spot
+(`server.cpmstar.com`), Bubblebox click-tracking URLs it pings on each screen
+change (`…clickreg.php?…&subid=loadscreen`, `splash`, `enternamescreen`,
+`menuscreen`), Newgrounds and GameShed hosts, and a GameShed achievement API.
+Every one of them lives *inside an SWF*, so there is nothing to delete in a
+script file — and none of them ever answered a plain request anyway (a dead host
+sends no CORS headers), so refusing them changes nothing the movie does. The page
+refuses them in a `window.fetch` guard: same origin, `data:` and `blob:` pass;
+anything else is rejected with a warning, once per URL. Ruffle never uses
+`XMLHttpRequest` — its wasm contains no such string, and one `fetch_with_request`
+— so `window.fetch` is the whole surface. Both converted pages carry the same
+guard, with the comment naming what that build reaches for.
 
 ### 14.7 Reading the save, and applying one from outside
 
-A SharedObject's bytes are AMF0, base64'd into an `@file` block: an entry is a
-`uint16` name length, the name, one AMF0 type byte, then the payload — a number is
-`00` and eight big-endian bytes, a string is `02` and a prefixed length. So
-`duck-life.swf/mydata` can be read with no tooling at all:
+A SharedObject's bytes are base64'd into an `@file` block, and they are readable
+by hand. Decoding both converted saves gives the same shape:
+
+    offset  bytes
+    0       `00 bf`
+    2       a uint32, big-endian: how many bytes follow the six-byte header
+    6       `TCSO`
+    10      `00 04 00 00 00 00`
+    16      the slot name: a uint16 length, then UTF-8 (`00 06` `mydata`)
+    24      four bytes, then the properties
+            each = a uint16 name length, the name, then the value:
+              number  `00`, eight big-endian bytes (a double), then `00`
+              string  `06`, a u29 length, then the UTF-8 bytes
+
+Fitted against both movies, that reads every field and lands exactly on the last
+byte; the numbers come back as the values they should be (`maxi` 20, `maxmaxi`
+30, `seed` 5) and the names as the strings the constant pool lists. The string
+form is the least exercised part of it — both saves hold only empty ones, because
+neither duck was ever named — so treat `06` as measured and other variants as
+unverified. What matters for hand inspection is that the names are legible, so a
+`@file` block can be read with no tooling at all:
 
     @file duck-life.swf/mydata
     AL8AAACxVENTTwAEAAAAAAAGbXlkYXRh…
@@ -2196,21 +2247,71 @@ next boot and survived there.
 
 ### 14.8 Verifying a Flash conversion
 
-- every request the page makes is loopback, and the two Mochi URLs appear as
-  refusals rather than as outbound requests;
+- every request the page makes is loopback, and the trackers the movie carries
+  appear as refusals rather than as outbound requests;
 - no exceptions, and no IndexedDB — Ruffle uses none;
-- the document holds one block, keyed `duck-life.swf/mydata`;
+- the document holds one block, keyed `<movie>.swf/mydata`;
 - the movie renders and responds to input. This is the check that says the player
   works at all: the canvas is not blank, and a click changes the frame;
-- the round trip: write a doctored SharedObject from a page that is not playing
-  the game, load the game, and confirm both that Ruffle is handed exactly those
-  bytes and that the game's own variables keep them.
+- the round trip. The cheapest proof is the read itself: wrap the area as it is
+  installed ([section 14.9](#149-what-the-second-conversion-added)) and log what
+  Ruffle is handed. A fresh document gives `-> undefined`; a document holding the
+  save gives that save's length back. Anything the movie then writes it can only
+  have got from the document;
+- the slower proof, for a save with a value worth watching: write a doctored
+  SharedObject from a page that is *not* playing the game, load the game, and
+  confirm both that Ruffle is handed exactly those bytes and that the game's own
+  variables keep them.
 
-Eight further Ruffle wrappers are in this repo still on the old bridge
-(`duck-life-2`, `duck-life-3`, `learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`,
-`motox3m-3`, `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the
-same three things: the player vendored, `installSharedObjects('<movie>.swf')`
-before it, and the movie named correctly.
+Seven further Ruffle wrappers are in this repo still on the old bridge
+(`duck-life-3`, `learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
+`the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the same three
+things: the player vendored, `installSharedObjects('<movie>.swf')` before it, and
+the movie named correctly.
+
+### 14.9 What the second conversion added
+
+**A movie may not touch its save until the game is started.** Duck Life 1 calls
+`getLocal` the moment it loads. Duck Life 2 does not: with the page sitting on its
+menu, the area is never touched, there is no read and no write, and the document
+stays empty — which looks exactly like a conversion that failed. The first
+storage event arrives when the player clicks **PLAY**, and the save follows ~6 s
+and ~15 s later (224 bytes, then the full 308 as the game fills in the rest of its
+fields). The click is at the bottom centre of the stage — for Duck Life 2's layout,
+`(660, 580)` in a 1280×800 window. Nothing about this is Duck Life 2's fault; it
+is the normal behaviour of a build that creates its save when a game starts, and
+it means *a conversion cannot be judged before the game is played*.
+
+**The read is the round trip.** Instrumenting the installed area
+([section 14.4](#144-the-surface-ruffle-uses-is-the-property-one)) gives the
+sharpest proof available, and it needs no byte surgery: log every access to the
+area, boot once with an empty document, then boot again with the save in place.
+The same single key comes back `undefined` the first time and as the stored
+body's length the second — and on that second boot the movie writes the *whole*
+save from its first flush (308 bytes, six times) where the first boot had to build
+up to it (224 four times, then 308). A game that had not read anything would have
+rebuilt the partial version again.
+
+To install that wrapper the value has to be caught *as it is installed*, not
+where it is returned:
+
+```js
+var dp = Object.defineProperty;
+Object.defineProperty = function (target, prop, desc) {
+  if (target === window && prop === 'localStorage' && desc && 'value' in desc) {
+    desc = Object.assign({}, desc, { value: wrapForLogging(desc.value) });
+  }
+  return dp.call(Object, target, prop, desc);
+};
+```
+
+Hooking `PluStore.installSharedObjects` instead does nothing, and is worth knowing
+about because it fails quietly: the hook wraps the value the call *returns*, while
+the area that lands on `window.localStorage` is the one installed inside it, so
+nothing that plays the game ever touches the wrapper. Since the wrapper is a
+`Proxy` around the real area, PluStore's own `window.localStorage !== area` check
+fails while it is in place and prints *"the save would not be ours"*. That warning
+is the probe's, not the page's — remove the wrapper and it goes away.
 
 ---
 
@@ -2221,7 +2322,8 @@ failure mode that looks like success. The engine-specific half of each step is
 where the work is: [section 11.5](#115-verifying-a-web-storage-conversion) for a
 `localStorage` engine, [section 10.5](#105-verifying-a-godot-conversion) for a
 Godot export, [section 12.8](#128-verifying-a-playables-conversion) for a host SDK,
-and the notes at the end of sections 6–9 for the rest.
+[section 14.8](#148-verifying-a-flash-conversion) for a Flash movie, and the notes
+at the end of sections 6–9 for the rest.
 
 1. **The document appears.** `localStorage` holds one key, and it is readable
    text: `localStorage.getItem('plu:text:<game>')`.

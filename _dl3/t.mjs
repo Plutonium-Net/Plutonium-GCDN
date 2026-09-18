@@ -1,0 +1,12 @@
+import { launch, sleep } from './cdp.mjs';
+const page = await launch();
+page.raw.onClose(() => console.log('closed!'));
+await page.send('Runtime.enable');
+await page.navigate('http://127.0.0.1:8342/games/duck-life-3/index.html');
+await sleep(5000);
+console.log('title:', await page.evaluate('document.title'));
+await sleep(3000);
+console.log('still alive:', await page.evaluate('1+1'));
+page.close();
+console.log('done');
+process.exit(0);
