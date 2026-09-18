@@ -1,277 +1,435 @@
 <!DOCTYPE html>
 
-
 <!-- Pluto Game 9/11/2026 -->
 
-
 <html lang="en-us">
-  <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/lolshooter2-main/">
 <head>
-<script src="../../js/sync.js"></script>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Funny Shooter 2</title>
-    <link rel="shortcut icon" href="favicon.ico">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Funny Shooter 2</title>
 
-    <script>
-    (function() {
+  <!-- The save. Two surfaces, one document — see both notes below. Ordered so
+       that PluStore exists before anything reads a save, and the SDK stand-in
+       exists before the game's own glue runs. -->
+  <script src="../../js/plustore.js"></script>
+  <script>PluStore.configure({ game: 'funny-shooter-2', mount: '/idbfs' });</script>
+  <script src="yandex-sdk-local.js"></script>
+
+  <!-- The old storage method is gone. This page used to be a wrapper: <base>
+       pointed every relative path at a jsDelivr folder, js/sync.js carried the
+       save off to a server, and the real Yandex SDK (v2.js) came with it. The
+       build is local now, the save is PluStore's, and the SDK is replaced by
+       yandex-sdk-local.js, which says what the real one does here. -->
+
+  <script>
+    /* Nothing on this page belongs off the machine, so nothing is allowed off
+       it. This build is Unity 2020.3.37f1, and a player of that era carries its
+       own telemetry — the compiled player posts analytics from inside the wasm
+       image, where it cannot be edited out. Both of its endpoints
+       (`config.uca.cloud.unity3d.com` and `cdp.cloud.unity3d.com/v1/events`)
+       are refused here, in the same way and for the same reason as the engine
+       scripts in a wrapper page. A refused request looks to the player exactly
+       like an offline one, which is the point: this is a local copy, and a
+       local copy is offline by design.
+
+       Relative and same-origin URLs are the whole game — the build, the part
+       files, and the blob URLs the merger below mints — so those pass. */
+    (function () {
+      function allowed(url) {
+        var text = String(url === undefined || url === null ? '' : url);
+        if (!text) return true;                       /* relative to this page */
+        if (text.indexOf('blob:') === 0 || text.indexOf('data:') === 0) return true;
+        if (text[0] === '/' || text[0] === '.') return true;
+        try { return new URL(text, location.href).origin === location.origin; }
+        catch (e) { return false; }
+      }
+      /* A refused request is *answered*, never broken.
+
+         This matters more than it looks. An engine that gets an error from a
+         request it made may treat that error as fatal: Unity's WebGL player
+         calls its C# error handler and then `abort()`s the entire runtime, so a
+         refused telemetry ping during startup took Funny Shooter 2 down with an
+         `abort(53)` stack instead of the game simply not phoning home. What an
+         offline machine looks like to the engine is an *empty* response, so
+         that is what a blocked request gets: 200, no body, nothing sent. The
+         request still never leaves the machine, which is the point. */
+      window.pluRefused = [];
+      function refuse(what, url) {
+        var text = String(url);
+        window.pluRefused.push(text);
+        console.info('Funny Shooter 2: refusing ' + what + ' to ' + text +
+          ' — this copy is local, so nothing leaves the machine. It is answered with an empty response.');
+      }
+      function emptyBodyUrl() {
+        return URL.createObjectURL(new Blob([], { type: 'application/octet-stream' }));
+      }
+
+      var open = XMLHttpRequest.prototype.open, send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        this.pluBlocked = null;
+        if (!allowed(url)) {
+          refuse('a request', url);
+          this.pluBlocked = emptyBodyUrl();
+          /* The method is rewritten to GET as well as the URL: a `blob:` URL
+             can be read but not posted to, so a blocked POST that kept its
+             method came back `status 0` — a failure, which is the very thing
+             this is here to avoid. As a GET it is a well-formed 200 with an
+             empty body, for every method the caller used. The body is not
+             forwarded either: nothing leaves the machine. */
+          return open.apply(this, ['GET', this.pluBlocked].concat(
+            Array.prototype.slice.call(arguments, 2)));
+        }
+        return open.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function () {
+        if (this.pluBlocked) {
+          var url = this.pluBlocked;
+          this.addEventListener('loadend', function () { URL.revokeObjectURL(url); });
+          return send.call(this);
+        }
+        return send.apply(this, arguments);
+      };
+
+      if (window.fetch) {
+        var realFetch = window.fetch;
+        window.fetch = function (input) {
+          var url = typeof input === 'string' ? input : (input && input.url);
+          if (!allowed(url)) {
+            refuse('a fetch', url);
+            return Promise.resolve(new Response(new Blob([], { type: 'application/octet-stream' }),
+              { status: 200, statusText: 'OK (local copy: empty answer for ' + url + ')' }));
+          }
+          return realFetch.apply(this, arguments);
+        };
+      }
+
+      if (navigator.sendBeacon) {
+        var beacon = navigator.sendBeacon.bind(navigator);
+        navigator.sendBeacon = function (url, data) {
+          if (!allowed(url)) { refuse('a beacon', url); return true; }
+          return beacon(url, data);
+        };
+      }
+    })();
+  </script>
+
+  <script>
+    /* If this page cannot start, say which file is wrong and why, on the page
+       rather than in an alert that vanishes. Every failure that reaches this is
+       a copy of the folder in the wrong shape, and each one gets a sentence
+       naming the file. Defined here, before the merger and the boot below, because
+       both of them report through it. */
+    function reportProblem(headline, detail) {
+      var cover = document.getElementById('loading-cover');
+      if (cover) cover.style.display = 'none';
+      if (document.getElementById('plu-startup-error')) return;
+      /* If anything was refused before the failure, say so on the panel: a
+         runtime that dies right after a blocked request is a different story
+         from one that dies on its own, and the URL is the whole story. */
+      var refused = window.pluRefused || [];
+      if (refused.length) {
+        detail += '\n\nThis copy refused ' + refused.length + ' request(s) off the machine before' +
+          ' this: ' + refused.join(', ') + '.';
+      }
+      var box = document.createElement('div');
+      box.id = 'plu-startup-error';
+      box.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;gap:.75rem;' +
+        'align-items:center;justify-content:center;text-align:center;color:#e6e6e6;background:#111;' +
+        'padding:2rem;font:14px/1.6 system-ui,sans-serif;white-space:pre-wrap;';
+      var title = document.createElement('strong');
+      title.textContent = headline;
+      var body = document.createElement('span');
+      body.textContent = detail;
+      box.appendChild(title);
+      box.appendChild(body);
+      document.body.appendChild(box);
+      console.error('Funny Shooter 2: ' + headline + ' — ' + detail);
+    }
+  </script>
+
+  <script>
+    /* The build ships its data file split in two, and Unity's loader asks for
+       the whole thing by name. This merges the parts into one blob and hands
+       that to whichever request asks for it — the loader's, whether it comes in
+       through fetch or XHR. It is the game's own shipping scheme, kept as it
+       was; only the URLs under it changed, from the CDN to this folder. */
+    (function () {
       'use strict';
-      
-      const config = {
+
+      var config = {
         files: [
           { name: 'FunnyShooter2_Yandex.data.unityweb', parts: 2 }
         ],
         debug: true
       };
-      
+
       window.blobUrls = {};
       window.mergedFiles = {};
-      const mergeStatus = {};
+      var mergeStatus = {};
 
-      function log(...args) { 
-        if (config.debug) console.log('[BlobMerger]', ...args); 
+      function log() { if (config.debug) console.log('[BlobMerger]', ...arguments); }
+      function error() { console.error('[BlobMerger]', ...arguments); }
+
+      function normalizeUrl(url) {
+        try { return decodeURIComponent(url.toString().split('?')[0]); }
+        catch (e) { return url; }
       }
-      
-      function error(...args) { 
-        console.error('[BlobMerger]', ...args); 
-      }
-      
-      function normalizeUrl(url) { 
-        try { 
-          return decodeURIComponent(url.toString().split('?')[0]); 
-        } catch (e) { 
-          return url; 
-        } 
-      }
-      
+
       function urlsMatch(url1, url2) {
-        const n1 = normalizeUrl(url1), n2 = normalizeUrl(url2);
+        var n1 = normalizeUrl(url1), n2 = normalizeUrl(url2);
         if (n1 === n2 || n1.endsWith(n2) || n2.endsWith(n1)) return true;
         return n1.split('/').pop() === n2.split('/').pop();
       }
 
       async function mergeSplitFiles(filePath, partsCount) {
         try {
-          const parts = [];
-          for (let i = 1; i <= partsCount; i++) {
-            parts.push(`${filePath}.part${i}`);
+          var parts = [];
+          for (var i = 1; i <= partsCount; i++) parts.push(filePath + '.part' + i);
+          log('Merging ' + filePath + ' from ' + partsCount + ' parts...');
+
+          var responses = await Promise.all(parts.map(function (p) { return fetch(p); }));
+          for (var r = 0; r < responses.length; r++) {
+            if (!responses[r].ok) {
+              throw new Error('Part missing: ' + responses[r].url + ' (' + responses[r].status + ')');
+            }
           }
-          log(`Merging ${filePath} from ${partsCount} parts...`);
-          
-          const responses = await Promise.all(parts.map(p => fetch(p)));
-          for (const r of responses) {
-            if (!r.ok) throw new Error(`Part missing: ${r.url} (${r.status})`);
+
+          var buffers = await Promise.all(responses.map(function (x) { return x.arrayBuffer(); }));
+          var totalLen = buffers.reduce(function (acc, b) { return acc + b.byteLength; }, 0);
+          var merged = new Uint8Array(totalLen);
+          var offset = 0;
+          for (var b = 0; b < buffers.length; b++) {
+            merged.set(new Uint8Array(buffers[b]), offset);
+            offset += buffers[b].byteLength;
           }
-          
-          const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
-          const totalLen = buffers.reduce((acc, b) => acc + b.byteLength, 0);
-          const merged = new Uint8Array(totalLen);
-          let offset = 0;
-          
-          for (const b of buffers) { 
-            merged.set(new Uint8Array(b), offset); 
-            offset += b.byteLength; 
-          }
-          
-          log(`✅ Merged: ${filePath} (${(totalLen/1024/1024).toFixed(2)} MB)`);
-          
-          const mimeType = 'application/octet-stream';
-          const blob = new Blob([merged], { type: mimeType });
-          const blobUrl = URL.createObjectURL(blob);
-          
-          log(`✅ Created blob URL for: ${filePath}`);
-          
+
+          log('Merged: ' + filePath + ' (' + (totalLen / 1024 / 1024).toFixed(2) + ' MB)');
+
+          var blobUrl = URL.createObjectURL(new Blob([merged], { type: 'application/octet-stream' }));
           return { buffer: merged.buffer, blobUrl: blobUrl };
-        } catch (e) { 
-          error(e); 
-          throw e; 
+        } catch (e) {
+          error(e);
+          throw e;
         }
       }
 
       function shouldIntercept(url) {
-        const s = normalizeUrl(url);
-        if (s.includes('.part')) return null;
-        
-        for (const f of config.files) {
-          if (urlsMatch(s, f.name)) {
-            return f.name;
-          }
+        var s = normalizeUrl(url);
+        if (s.indexOf('.part') >= 0) return null;
+        for (var i = 0; i < config.files.length; i++) {
+          if (urlsMatch(s, config.files[i].name)) return config.files[i].name;
         }
         return null;
       }
 
       function getBlobUrl(name) {
         if (window.blobUrls[name]) return window.blobUrls[name];
-        for (const [k, v] of Object.entries(window.blobUrls)) {
-          if (urlsMatch(k, name)) return v;
-        }
-        return null;
-      }
-
-      function getMergedBuffer(name) {
-        if (window.mergedFiles[name]) return window.mergedFiles[name];
-        for (const [k, v] of Object.entries(window.mergedFiles)) {
-          if (urlsMatch(k, name)) return v;
+        for (var k in window.blobUrls) {
+          if (urlsMatch(k, name)) return window.blobUrls[k];
         }
         return null;
       }
 
       if (!window.originalFetch) window.originalFetch = window.fetch;
-      window.fetch = function(url, ...args) {
-        const name = shouldIntercept(url);
+      window.fetch = function (url) {
+        var name = shouldIntercept(url);
         if (name) {
-          log('Intercepting fetch for:', name);
-          return new Promise((resolve, reject) => {
-            const interval = setInterval(() => {
-              const blobUrl = getBlobUrl(name);
+          log('Intercepting fetch for: ' + name);
+          var rest = Array.prototype.slice.call(arguments, 1);
+          return new Promise(function (resolve, reject) {
+            var interval = setInterval(function () {
+              var blobUrl = getBlobUrl(name);
               if (blobUrl) {
                 clearInterval(interval);
-                log('Fetching from blob URL:', name);
-                window.originalFetch(blobUrl, ...args)
-                  .then(resolve)
-                  .catch(reject);
-              } else if (mergeStatus[name] === 'failed') { 
-                clearInterval(interval); 
-                reject(new Error('Merge failed')); 
+                log('Fetching from blob URL: ' + name);
+                window.originalFetch.apply(window, [blobUrl].concat(rest)).then(resolve).catch(reject);
+              } else if (mergeStatus[name] === 'failed') {
+                clearInterval(interval);
+                reportProblem('Funny Shooter 2 could not start.', name + ' could not be assembled from' +
+                  ' its parts, so the build is incomplete in this folder.');
+                reject(new Error('Merge failed'));
               }
             }, 50);
           });
         }
-        return window.originalFetch.call(this, url, ...args);
-      }
+        return window.originalFetch.apply(this, arguments);
+      };
 
       if (!window.OriginalXMLHttpRequest) window.OriginalXMLHttpRequest = window.XMLHttpRequest;
-      window.XMLHttpRequest = function(opts) {
-        const xhr = new window.OriginalXMLHttpRequest(opts);
-        const originalOpen = xhr.open;
-        const originalSend = xhr.send;
-        
-        xhr.open = function(method, url, ...args) { 
+      window.XMLHttpRequest = function (opts) {
+        var xhr = new window.OriginalXMLHttpRequest(opts);
+        var originalOpen = xhr.open;
+        var originalSend = xhr.send;
+
+        xhr.open = function (method, url) {
           this._url = url;
           this._method = method;
-          this._openArgs = args;
-          const name = shouldIntercept(url);
-          
+          this._openArgs = Array.prototype.slice.call(arguments, 2);
+          var name = shouldIntercept(url);
           if (name) {
-            log('Intercepting XHR open:', name);
+            log('Intercepting XHR open: ' + name);
             this._shouldIntercept = true;
             this._interceptName = name;
             return;
           }
-          
-          return originalOpen.call(this, method, url, ...args); 
+          return originalOpen.apply(this, arguments);
         };
-        
-        xhr.send = function(...args) {
+
+        xhr.send = function () {
           if (this._shouldIntercept) {
-            const name = this._interceptName;
-            log('Intercepting XHR send:', name);
-            
-            const checkInterval = setInterval(() => {
-              const blobUrl = getBlobUrl(name);
+            var self = this;
+            var args = arguments;
+            var name = this._interceptName;
+            log('Intercepting XHR send: ' + name);
+            var checkInterval = setInterval(function () {
+              var blobUrl = getBlobUrl(name);
               if (blobUrl) {
                 clearInterval(checkInterval);
-                log('Sending XHR with blob URL:', name);
-                originalOpen.call(this, this._method, blobUrl, ...this._openArgs);
-                originalSend.call(this, ...args);
+                log('Sending XHR with blob URL: ' + name);
+                originalOpen.apply(self, [self._method, blobUrl].concat(self._openArgs));
+                originalSend.apply(self, args);
               } else if (mergeStatus[name] === 'failed') {
+                /* A missing part used to leave this request unanswered, so the
+                   player sat on the loading cover for ever with the only clue
+                   in the console. Ask for the original URL instead: it 404s,
+                   and the loader reports that the way it reports any missing
+                   file. The merging itself is the game's own scheme, unchanged. */
                 clearInterval(checkInterval);
-                error('Failed to get blob URL for:', name);
+                error('Merge failed for ' + name + ' — falling back to the original URL so the failure is reported.');
+                reportProblem('Funny Shooter 2 could not start.', name + ' could not be assembled from' +
+                  ' its parts, so the build is incomplete in this folder.');
+                try {
+                  originalOpen.apply(self, [self._method, self._url].concat(self._openArgs));
+                  originalSend.apply(self, args);
+                } catch (e) {
+                  error(e);
+                }
               }
             }, 50);
             return;
           }
-          
-          return originalSend.call(this, ...args);
+          return originalSend.apply(this, arguments);
         };
-        
-        return xhr;
-      }
 
-      async function start() {
+        return xhr;
+      };
+
+      (async function start() {
         log('Starting merge process...');
-        for (const f of config.files) {
+        for (var i = 0; i < config.files.length; i++) {
+          var f = config.files[i];
           mergeStatus[f.name] = 'merging';
-          
           try {
-            const result = await mergeSplitFiles(f.name, f.parts);
+            var result = await mergeSplitFiles(f.name, f.parts);
             window.mergedFiles[f.name] = result.buffer;
             window.blobUrls[f.name] = result.blobUrl;
             mergeStatus[f.name] = 'ready';
-            log(`✅ Ready: ${f.name}`);
+            log('Ready: ' + f.name);
           } catch (err) {
             mergeStatus[f.name] = 'failed';
-            error(`Failed to merge ${f.name}:`, err);
+            error('Failed to merge ' + f.name + ': ' + err);
           }
         }
         log('All files processed. Ready to load Unity.');
-      }
-      
-      start();
+      })();
     })();
-    </script>
-  
+  </script>
+
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body class="dark">
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas"></canvas>
-    </div>
-    <div id="loading-cover" style="display:none;">
-      <div id="unity-loading-bar">
-        <div id="unity-logo"><img src="logo.png"></div>
-        <div id="unity-progress-bar-empty" style="display: none;">
-          <div id="unity-progress-bar-full"></div>
-        </div>
-        <div class="spinner"></div>
+  <div id="unity-container" class="unity-desktop">
+    <canvas id="unity-canvas"></canvas>
+  </div>
+  <div id="loading-cover" style="display:none;">
+    <div id="unity-loading-bar">
+      <div id="unity-logo"><img src="logo.png"></div>
+      <div id="unity-progress-bar-empty" style="display: none;">
+        <div id="unity-progress-bar-full"></div>
       </div>
+      <div class="spinner"></div>
     </div>
-    <div id="unity-fullscreen-button" style="display: none;"></div>
-    <script>
-      const hideFullScreenButton = "1";
-      const buildUrl = "Build";
-      const loaderUrl = "FunnyShooter2_Yandex.loader.js";
-      const config = {
-        dataUrl: "FunnyShooter2_Yandex.data.unityweb",
-        frameworkUrl: "FunnyShooter2_Yandex.framework.js.unityweb",
-        codeUrl: "FunnyShooter2_Yandex.wasm.unityweb",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "GoGoMan",
-        productName: "Funny Shooter 2",
-        productVersion: "1.0.1",
-      };
+  </div>
+  <div id="unity-fullscreen-button" style="display: none;"></div>
 
-      const container = document.querySelector("#unity-container");
-      const canvas = document.querySelector("#unity-canvas");
-      const loadingCover = document.querySelector("#loading-cover");
-      const progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
-      const progressBarFull = document.querySelector("#unity-progress-bar-full");
-      const fullscreenButton = document.querySelector("#unity-fullscreen-button");
-      const spinner = document.querySelector('.spinner');
+  <script>
+    const hideFullScreenButton = "1";
+    const loaderUrl = "FunnyShooter2_Yandex.loader.js";
+    const config = {
+      dataUrl: "FunnyShooter2_Yandex.data.unityweb",
+      /* The glue Unity ships is a compressed container. The patched copy is
+         served as a plain .js beside it: the loader decides whether to
+         decompress by looking for the container's marker, so an uncompressed
+         file is used as it is. Snow Rider 3D in this catalogue is laid out the
+         same way, and the original .unityweb stays untouched next to it. */
+      frameworkUrl: "FunnyShooter2_Yandex.framework.js",
+      codeUrl: "FunnyShooter2_Yandex.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "GoGoMan",
+      productName: "Funny Shooter 2",
+      productVersion: "1.0.1",
+    };
 
-      const canFullscreen = (function() {
-        for (const key of [
-            'exitFullscreen',
-            'webkitExitFullscreen',
-            'webkitCancelFullScreen',
-            'mozCancelFullScreen',
-            'msExitFullscreen',
-          ]) {
-          if (key in document) {
-            return true;
-          }
-        }
-        return false;
-      }());
+    const container = document.querySelector("#unity-container");
+    const canvas = document.querySelector("#unity-canvas");
+    const loadingCover = document.querySelector("#loading-cover");
+    const progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
+    const progressBarFull = document.querySelector("#unity-progress-bar-full");
+    const fullscreenButton = document.querySelector("#unity-fullscreen-button");
+    const spinner = document.querySelector('.spinner');
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        container.className = "unity-mobile";
-        config.devicePixelRatio = 1;
+    const canFullscreen = (function () {
+      for (const key of [
+        'exitFullscreen',
+        'webkitExitFullscreen',
+        'webkitCancelFullScreen',
+        'mozCancelFullScreen',
+        'msExitFullscreen',
+      ]) {
+        if (key in document) return true;
       }
-      canvas.style.background = "url('FunnyShooter2_Yandex.jpg') center / cover";
-      loadingCover.style.display = "";
+      return false;
+    })();
 
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      container.className = "unity-mobile";
+      config.devicePixelRatio = 1;
+    }
+    canvas.style.background = "url('FunnyShooter2_Yandex.jpg') center / cover";
+    loadingCover.style.display = "";
+
+    /* Look at the glue before Unity's loader is asked for anything.
+
+       `frameworkUrl` must be the patched copy served as plain JS, sitting next
+       to the untouched .unityweb. Two wrong copies are both possible and both
+       fail the same opaque way — the loader says "Unable to parse ... The file
+       is corrupt, or compression was misconfigured?" or "Unable to load file
+       ... Check that the file exists on the remote server", neither of which
+       names a stale browser cache or a folder missing a file. So the copy is
+       checked here, and revalidated (`no-cache`) while doing it, which also
+       replaces a stale cached entry with the real one. */
+    function checkGlue() {
+      return fetch(config.frameworkUrl, { cache: "no-cache" }).then((res) => {
+        if (!res.ok) throw new Error(config.frameworkUrl + " answered HTTP " + res.status);
+        return res.arrayBuffer();
+      }).then((bytes) => {
+        const head = new Uint8Array(bytes.slice(0, 3));
+        /* 6b 8d 00 + "UnityWeb Compressed Content" is the container the glue
+           ships in. The loader only unpacks a container whose URL says so, so a
+           container served as a .js never loads. */
+        if (head[0] === 0x6b && head[1] === 0x8d && head[2] === 0x00) {
+          throw new Error(config.frameworkUrl + " is a compressed container — this is the original" +
+            " glue, or a cached copy of it, not the patched one.");
+        }
+        if (!/function unityFramework/.test(new TextDecoder().decode(bytes.slice(0, 4096)))) {
+          throw new Error(config.frameworkUrl + " does not define unityFramework — it is not the glue.");
+        }
+      });
+    }
+
+    function boot() {
       const script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
@@ -283,22 +441,35 @@
           window.unityInstance = unityInstance;
           loadingCover.style.display = "none";
           if (canFullscreen) {
-            if (!hideFullScreenButton) {
-              fullscreenButton.style.display = "";
-            }
-            fullscreenButton.onclick = () => {
-              unityInstance.SetFullscreen(1);
-            };
+            if (!hideFullScreenButton) fullscreenButton.style.display = "";
+            fullscreenButton.onclick = () => { unityInstance.SetFullscreen(1); };
           }
         }).catch((message) => {
-          alert(message);
+          reportProblem("Funny Shooter 2 could not start.", String(message));
         });
       };
+      script.onerror = () => {
+        reportProblem("Funny Shooter 2 could not start.", "The Unity loader, " + loaderUrl +
+          ", is missing from this folder.");
+      };
       document.body.appendChild(script);
-    </script>
-    <script src="v2"></script>
+    }
+
+    checkGlue().then(boot).catch((e) => {
+      reportProblem("Funny Shooter 2 could not start.", e.message + "\n\nThis game is a local copy: " +
+        "the folder must hold the patched " + config.frameworkUrl + " beside the original " +
+        config.frameworkUrl + ".unityweb. A hard reload (Ctrl+Shift+R) fetches a fresh copy if the " +
+        "browser cached the wrong one.");
+    });
+  </script>
 
   <script type="text/javascript">
+    /* The game's contract with this page, unchanged: every function below is
+       called from C# through the glue Unity compiled — checkCom, checkSave
+       (which loads the player's data), saveCloud, checkLanguage, showFullscrenAd,
+       showRewardedAd, purchaseComplete, buy, rate. Only where the data goes has
+       changed: `player` is yandex-sdk-local's, and it writes into the one
+       document. */
     var player = null;
     var sdk;
     var payments = null;
@@ -317,29 +488,29 @@
           ysdk.getPlayer({ signed: true }).then(_player => {
             player = _player;
           }).catch(err => {
+            console.warn('Funny Shooter 2: no player data available', err);
           });
           ysdk.getPayments({ signed: true }).then(_payments => {
             payments = _payments;
             console.log("Purchasing True");
             payments.getPurchases().then(purchases => {
-            if (purchases.some(purchase => purchase.productID === 'remove_ads')) {
+              if (purchases.some(purchase => purchase.productID === 'remove_ads')) {
                 SHOW_ADS = false;
               }
+            }).catch(err => {
+            })
           }).catch(err => {
           })
-          }).catch(err => {
-          })
-          if(SHOW_ADS){
+          if (SHOW_ADS) {
             sdk.adv.showFullscreenAdv({ callbacks: {} });
             sdk.adv.showBannerAdv();
           }
-          else
-          {
+          else {
             sdk.adv.hideBannerAdv();
           }
         });
     } else {
-      console.warn('YaGames SDK not available');
+      console.warn('Funny Shooter 2: no Yandex SDK stand-in loaded — the game will not see a save');
     }
 
     function checkCom() {
@@ -368,33 +539,30 @@
       }
     }
 
-    function purchaseComplete(id) 
-    {
-        if(id == 0)
-        {
-            SHOW_ADS = false;
-            if (sdk) sdk.adv.hideBannerAdv();
-        }
+    function purchaseComplete(id) {
+      if (id == 0) {
+        SHOW_ADS = false;
+        if (sdk) sdk.adv.hideBannerAdv();
+      }
     }
 
-    function checkShop() 
-    {
-        if (payments) {
-          payments.getPurchases().then(purchases => {
-            if (purchases.some(purchase => purchase.productID === 'remove_ads')) {
-                SHOW_ADS = false;
-                window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 0);
-                sdk.adv.hideBannerAdv();
-            }
-            if (purchases.some(purchase => purchase.productID === 'weapon_1')) {
-                window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 3);
-            }
-            if (purchases.some(purchase => purchase.productID === 'weapon_2')) {
-                window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 4);
-            }
-          }).catch(err => {
-          })
-        }
+    function checkShop() {
+      if (payments) {
+        payments.getPurchases().then(purchases => {
+          if (purchases.some(purchase => purchase.productID === 'remove_ads')) {
+            SHOW_ADS = false;
+            window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 0);
+            sdk.adv.hideBannerAdv();
+          }
+          if (purchases.some(purchase => purchase.productID === 'weapon_1')) {
+            window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 3);
+          }
+          if (purchases.some(purchase => purchase.productID === 'weapon_2')) {
+            window.unityInstance.SendMessage('SDKPlatforms', 'ShopComplete', 4);
+          }
+        }).catch(err => {
+        })
+      }
     }
 
     function initPurchasing() {
@@ -423,8 +591,7 @@
       if (payments != null) {
         payments.purchase({ id: id_buy }).then(purchase => {
           window.unityInstance.SendMessage('SDKPlatforms', 'PurchasesComplete', id_buy);
-          if (id_buy != 'remove_ads') 
-          {
+          if (id_buy != 'remove_ads') {
             payments.consumePurchase(purchase.purchaseToken);
           }
         });
@@ -432,7 +599,7 @@
     }
 
     function checkSave() {
-        loadData();
+      loadData();
     }
 
     function checkLanguage() {
@@ -457,13 +624,16 @@
       }
     }
 
+    /* The data load. The keys are the game's own, and they are the whole save as
+       far as the SDK knows: `save1`, `save2`, and the counter that decides which
+       copy is newer. */
     function loadData() {
       if (player != null) {
         console.log("Loading......")
         var save1;
         var save2;
         player.getData(["save1", "save2"]).then(data => {
-          if(data.save1) {
+          if (data.save1) {
             console.log("Load")
             window.unityInstance.SendMessage('SDKPlatforms', 'LoadCloudFirst', data.save1);
             window.unityInstance.SendMessage('SDKPlatforms', 'LoadCloud', data.save2);
@@ -504,9 +674,9 @@
           }
         }).catch(() => {
           player.setData({
-             save1: dataSave,
-             save2: dataSave2,
-             counterFunny2: counterSave,
+            save1: dataSave,
+            save2: dataSave2,
+            counterFunny2: counterSave,
           }).then(() => {
             console.log('data is set -first');
           });
@@ -516,9 +686,7 @@
 
     function showFullscrenAd() {
       if (sdk && sdk.adv) {
-        sdk.adv.showFullscreenAdv({
-          callbacks: {}
-        })
+        sdk.adv.showFullscreenAdv({ callbacks: {} })
       }
     }
 
@@ -547,5 +715,5 @@
       }
     }
   </script>
-  </body>
+</body>
 </html>

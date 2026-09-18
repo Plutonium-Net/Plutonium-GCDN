@@ -8,7 +8,7 @@ The reference implementation and working example is `snow-rider-3d`. Read
 `games/snow-rider-3d/index.html` alongside this document.
 
 - Engine: [`js/plustore.js`](js/plustore.js)
-- Reading a save: [section 16](#16-inspecting-a-save)
+- Reading a save: [section 17](#17-inspecting-a-save)
 
 ---
 
@@ -211,11 +211,13 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — seventeen games are on PluStore
-   so far, and 16 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — nineteen games are on PluStore
+   so far, and 14 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
+   The same applies to a **host SDK** the wrapper pulled off a CDN, which is the
+   second storage plane some builds have — [section 15](#15-yandex-games).
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -228,13 +230,16 @@ result is a save that looks fine and silently loses data. Remove all of it.
    document.
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
-   count in [section 15](#15-verifying-a-conversion).
+   count in [section 16](#16-verifying-a-conversion).
 
 ---
 
 ## 6. Unity WebGL
 
-Two changes to the page, two changes to the build. That is the whole job.
+Two changes to the page, two changes to the build — three when the build carries
+its own save call ([section 6.3](#63-cut-the-indexeddb-persistence)), and a
+fourth job entirely when it was shipped for a host platform
+([section 15](#15-yandex-games)). That is the whole job.
 
 ### 6.1 Load PluStore before the player
 
@@ -259,19 +264,31 @@ Build/UnityLoader.js                              ← loader; leave alone
 Build/<name>.wasm.framework.unityweb.js           ← player glue; patch this
 ```
 
+The glue may be shipped compressed, in a UnityWeb container (`6b 8d 00` +
+`UnityWeb Compressed Content (brotli)` + one brotli stream), or plain. Either
+way, **the patched copy can be served as a plain `.js` beside the original**, and
+that is what this catalogue does: the loader decides whether to decompress by
+running `hasUnityMarker()` over the bytes it fetched — the check is the exact
+header above — so a file without the marker is used as it is. Snow Rider 3D's
+build config already points `wasmFrameworkUrl` at a plain `.js` and keeps the
+compressed `.unityweb` next to it, unused; Funny Shooter 2 does the same with
+`frameworkUrl`. Nothing has to be re-pressed into a container, which also means
+the original file stays byte-for-byte what the export produced.
+
 A Unity 5.x export puts the same glue somewhere else: `Release/<name>.js`, beside
 `Release/<name>.asm.js`, `<name>.mem` and `<name>.data`, loaded by
 `Release/UnityLoader.js`. It is an asm.js build rather than a wasm one, but the
-file to patch and the two sites inside it are the same — see
+file to patch and the sites inside it are the same — see
 [section 6.6](#66-the-asmjs-era-layout).
 
-The framework file is minified onto a handful of enormous lines. Find the two
+The framework file is minified onto a handful of enormous lines. Find the
 spots by searching for these markers:
 
 ```bash
 grep -o 'FS.mount(IDBFS'        Build/*.wasm.framework.unityweb.js   # the mount
 grep -o 'FS.syncfs'             Build/*.wasm.framework.unityweb.js   # the flush
 grep -o '_JS_FileSystem_Sync'   Build/*.wasm.framework.unityweb.js   # the flush
+grep -o 'FS.syncfs(false'       Build/*.wasm.framework.unityweb.js   # the build's own save call, if it has one
 ```
 
 Both patch points are exact string replacements. There are no line numbers to
@@ -334,6 +351,20 @@ Replace it with:
 var fs={numPendingSync:0,syncIntervalID:0,syncInProgress:false,sync:(function(onlyPendingSync){var P=typeof window!=="undefined"&&window.PluStore;if(P)P.flush(FS,"/idbfs")})};function _JS_FileSystem_SetSyncInterval(ms){fs.syncIntervalID=window.setInterval((function(){fs.sync(true)}),ms)}function _JS_FileSystem_Sync(){var P=typeof window!=="undefined"&&window.PluStore;if(P)P.flush(FS,"/idbfs")}
 ```
 
+**The same two replacements, in a pretty-printed 2021 build** (Granny). The file
+is not minified, the mount step sits inside `if (!Module["ENVIRONMENT_IS_PTHREAD"])`
+and is left wrapped, and the flush helper is the only thing to patch because
+`_JS_FileSystem_Sync()` is `fs.sync(false)`:
+
+```js
+            // site 1 — replacing the mount and its FS.syncfs(true, …)
+            FS.mkdir("/idbfs");
+            if (typeof window !== "undefined" && window.PluStore) window.PluStore.boot(FS, "/idbfs")
+
+            // site 2 — the body of fs.sync, which the tick and _JS_FileSystem_Sync both call
+            if (typeof window !== "undefined" && window.PluStore) window.PluStore.flush(FS, "/idbfs")
+```
+
 Three details:
 
 - **Both `if(!Module.indexedDB) return;` guards must go.** They gate on a
@@ -348,6 +379,43 @@ Three details:
 `IDBFS` itself stays defined in the file. That is deliberate: it is unreachable
 dead code once nothing mounts it or calls `FS.syncfs`, and deleting it is a much
 larger, riskier edit for no benefit.
+
+**Site 3 — the build's own save call**, when the developer added one. A build
+whose C# calls a save function of its own has a *third* live `FS.syncfs` call,
+and it is the one that matters most: it is the game saying "save now". Funny
+Shooter 2's is a one-line import in the glue:
+
+```js
+function _SyncFiles(){FS.syncfs(false,(function(err){}))}
+```
+
+It is the same replacement shape as `_JS_FileSystem_Sync`, and the reason to look
+for it is that leaving it alone is *invisible*: the periodic tick still saves
+about once a second, so nothing looks broken, and the save the game asked for is
+the one that goes nowhere.
+
+```js
+function _SyncFiles(){var P=typeof window!=="undefined"&&window.PluStore;if(P)P.flush(FS,"/idbfs")}
+```
+
+Find it by grepping the glue for `FS.syncfs(false` and reading each hit: the
+emscripten `FS.syncfs` implementation, `IDBFS.syncfs` and the mount plumbing all
+take an argument list, while a save import called from C# is a bare one-line
+function that returns nothing — that is the one to patch. There is no fixed name
+for it; `_SyncFiles` is one developer's naming, and a build without such an
+import simply has nothing to patch here. **Verify it by counting rather than by
+reading:** wrap `PluStore.flush` from the page, keep a stack of each call, and
+one boot of Funny Shooter 2 separates the sites cleanly — 241 calls through
+`_JS_FileSystem_Sync`, 6 through the periodic `fs.sync` tick, and 2 through
+`_SyncFiles` ([section 15.6](#156-verifying-this-conversion)).
+
+**A build can route both flush calls through the one helper**, and then site 2 is
+a single replacement rather than two. Granny's glue is the Unity 2021 layout, and
+it is pretty-printed rather than minified; its `_JS_FileSystem_Sync()` is
+literally `fs.sync(false)`, and the periodic tick is `fs.sync(true)`, so patching
+the body of `fs.sync` covers both. Nothing in the source says which shape you are
+looking at and the recipe cannot tell you either — patch the helper, then count
+the callers ([section 15.7](#157-what-the-second-conversion-added)).
 
 ### 6.4 What the page then does
 
@@ -369,7 +437,7 @@ records the real paths it found.
 ### 6.5 Applying an imported save
 
 Restoring happens at boot only, so an import is two steps — `PluStore.set(doc)`
-and then reload the frame ([section 16](#16-inspecting-a-save)).
+and then reload the frame ([section 17](#17-inspecting-a-save)).
 
 Both steps have to be inside the reload, because the running player is a writer:
 its sync tick serialises its own in-memory tree over whatever is in the backend
@@ -849,7 +917,7 @@ writes exactly one key, `reduxSaveGame`, and that string
 **never appears** in its `data.json` — it is built at runtime from a `gameName`
 variable (`"redux"`) plus a suffix. Grepping the project data is still the
 fastest way to find a key; when that comes up empty, wrap the store and watch
-what the game asks for ([section 15](#15-verifying-a-conversion)).
+what the game asks for ([section 16](#16-verifying-a-conversion)).
 
 ### 8.7 Store values carry a type tag
 
@@ -878,7 +946,7 @@ carries the LocalStorage plugin's keys and `c3-savegames-<project id>` the save
 slots. `PluStore.stores.names()` and `PluStore.stores.entries(name)` read them
 back decoded, which is how the key names in
 [section 8.6](#86-what-the-game-then-does-through-it) were found
-([section 16](#16-inspecting-a-save)).
+([section 17](#17-inspecting-a-save)).
 
 The project id is the one place a shared id shows up: three EO Interactive titles
 — Big FLAPPY, Big Tower Tiny Square 2 and Big NEON Tower — carry the same
@@ -1347,7 +1415,7 @@ Both decode without tooling. Buckshot Roulette's is binary —
 `user://buckshotroulette_options_12.shell` arrives as a `@base64` block and starts
 `f4 10 00 00 …`, with `setting_volume` legible inside it. Crazy Cattle 3D's is a
 text resource, `user://crazysavefile.tres`, so its `name = value` fields are in
-plain sight ([section 16](#16-inspecting-a-save)).
+plain sight ([section 17](#17-inspecting-a-save)).
 
 Two things a reader has to expect on a first run. The engine drops its own
 shader-cache directories into the document, so counting `@dir` blocks is easier
@@ -1491,7 +1559,7 @@ a game that swaps its own storage cannot take the document with it.
 The save is base64, so a reader cannot tell progress from the document alone; the
 game's own `base64.js` turns it back into its pipe-separated fields, and the
 cookie count on the screen is the game's own answer for the rest
-([section 16](#16-inspecting-a-save)).
+([section 17](#17-inspecting-a-save)).
 
 **Core Ball**, the other Web Storage engine here, keeps exactly one key:
 
@@ -1748,7 +1816,7 @@ whole can look perfectly healthy while the game is writing defaults over it
 
 ### 12.8 Verifying a Playables conversion
 
-The generic five steps in [section 15](#15-verifying-a-conversion) all apply. This
+The generic five steps in [section 16](#16-verifying-a-conversion) all apply. This
 game adds two that are specific to a host SDK, and both are cheap:
 
 1. **Count the reads and the writes, in order.** The save is written whole, so a
@@ -1934,7 +2002,7 @@ listing showed two rows for one file.
 
 With the player's own key names the seed lands outside the mount and there is
 nothing to collide. `flush()` still drops a tree file whose mounted path a hosted
-block already names ([section 18](#18-reference) for the API), because the
+block already names ([section 19](#19-reference) for the API), because the
 collision is a property of any host whose block names resolve inside the mount
 rather than of one configuration: a tree file with no hosted block behind it — the
 file that is only a file — is still written, and for an engine with no hosted
@@ -1999,7 +2067,7 @@ Then the game plays, and the save arrives: `Storage.put()` base64-encodes a
 database blob and calls `localStorage.setItem`, which the area turns into a block.
 The blob is **zlib-compressed JSON** — `{"v":6,"om":1,"os":1,"gc":{...}}` — so the
 document holds text, and the text is base64 of a compressed stream — so reading it
-means inflating it first ([section 16](#16-inspecting-a-save)).
+means inflating it first ([section 17](#17-inspecting-a-save)).
 
 ### 13.7 Applying a save from outside
 
@@ -2009,7 +2077,7 @@ shell flushes the whole mount when its page goes away, so clearing or replacing 
 document while an old player is still alive lets its dying flush put the old save
 straight back. Park the frame on `about:blank` (which unloads the player and lets it
 finish), change the document once it is gone, and only then start the game again
-([section 19](#19-known-limits)).
+([section 20](#20-known-limits)).
 
 The values that say whether any of it worked are the player's own:
 `Module._get_app_inited()`, and what the frame's `Storage.get(Storage.PREFIX, path)`
@@ -2407,7 +2475,361 @@ through the setter, and the wrapper sees every read and write the movie makes.
 
 ---
 
-## 15. Verifying a conversion
+## 15. Yandex Games
+
+Funny Shooter 2 is a Unity build that was shipped for Yandex Games, and that
+gives it a **second storage plane**. Its C# does not only keep progress in
+`PlayerPrefs`; it also asks the page to read and write the SDK's *player data*,
+and the page does that through `YaGames`. So a build with a host SDK is two
+jobs, not one: the `/idbfs` patch of [section 6](#6-unity-webgl), and the
+stand-in below. Miss the second and the game looks like a game that does not
+remember you, in exactly the way a missing `/idbfs` patch does.
+
+### 15.1 Find the second plane
+
+It is visible from both ends, and both ends are worth reading.
+
+**From the C# side**, in the compiled glue: every function the game calls in the
+page is an import, and the glue spells them out in one run near the end of the
+file. Search for the ones that touch storage:
+
+```bash
+grep -o 'function _[A-Za-z]*(){[^}]*}' Build/*.framework.js   # the zero-argument ones
+grep -o 'FS.syncfs(false'        Build/*.framework.js         # the save call, if it has one
+```
+
+Funny Shooter 2's glue carries these:
+
+```js
+function _CheckCom(){checkCom()}function _CheckSave(){checkSave()}
+function _Rate(){rate()}function _SaveCloud(dataSave,dataSave2,saveCounter){...saveCloud(dataStr,dataStr2,saveCounter)}
+function _ShowFullscreenAd(){showFullscrenAd()}function _ShowRewardedAd(id){showRewardedAd(id)}
+function _SyncFiles(){FS.syncfs(false,(function(err){}))}
+```
+
+`_CheckSave` and `_SaveCloud` are the second plane: the game loads its progress
+by calling one page function and saves it by calling another, and neither one
+has anything to do with `/idbfs`. `_SyncFiles` is the third patch site described
+in [section 6.3](#63-cut-the-indexeddb-persistence).
+
+**From the page side**, the same functions are defined in the wrapper's own
+script, and that is where the keys are:
+
+```js
+player.getData(["save1", "save2"])                 // load
+player.setData({ save1, save2, counterFunny2 })     // save
+```
+
+Two blobs — the game calls them `save1` and `save2` — plus a counter the game
+compares against to decide whose copy is newer. Note what the counter implies:
+the cloud copy can *refuse* a write it thinks is stale, so a converted page must
+answer `getData` honestly rather than always reporting "nothing stored".
+
+### 15.2 Why the real SDK cannot be loaded
+
+The tempting move is to keep loading `v2.js` — the real SDK, ~160 KB, which the
+wrapper page pulled off the CDN alongside the game. It is worse than loading
+nothing. Measured in the headless Chrome this conversion was verified in, with
+`v2.js` loaded and `YaGames.init()` called the way the page calls it:
+
+* **`init()` resolves anyway**, from an environment that is made up. There is no
+  `window.YandexGamesSDKEnvironment`, so the SDK answers from a placeholder:
+  `environment.i18n.lang` and `environment.i18n.tld` both come back `"ru"`, and
+  `environment.app.id` is `""`. This page reads `tld` to set the game's region
+  flag and `lang` to choose its language, so a local player is told they are
+  Russian on the ru domain. Nothing throws; the values are just wrong.
+* **Then `getPlayer({ signed: true })` rejects** with `No parent to post
+  message` — there is no Yandex Games frame above the page to handshake with
+  over `postMessage`, and the SDK's whole player-data API is that handshake. So
+  `player` stays `null`, the page's `loadData()` logs `No Save` and returns
+  without sending the game anything, and `saveCloud()` returns without writing
+  anything. Every save is dropped in silence.
+* **It calls home while doing it.** The Metrica counter
+  `https://mc.yandex.ru/watch/49035923` is requested on load, and the SDK's logs
+  are full of `No parent to post message` warnings from its auth, fullscreen and
+  analytics managers.
+
+A wrapper page that keeps the SDK is therefore a page whose saves go nowhere and
+whose console is full of errors — [section 5](#5-removing-the-old-storage-method)
+applies to it like any other remote engine script.
+
+### 15.3 The stand-in, and where its data goes
+
+`games/funny-shooter-2/yandex-sdk-local.js` defines the same object shape the
+page already talks to, backed by the one document. Only the members the build
+touches are defined: `YaGames.init`, `environment.i18n`, `getPlayer`,
+`getPayments` and `adv`. `getPlayer()` resolves an object with `getData(keys)`
+and `setData(values)`, which are the only two members that store anything.
+
+Player data is a set of named strings, which is what `PluStore.files` is for:
+
+```js
+PluStore.files.write('yandex/save1', text)     // the game's own key names
+PluStore.files.read('yandex/save1')            // that string back, or null
+```
+
+Two details are not cosmetic:
+
+* **The prefix is load-bearing.** A Unity flush rewrites the whole document out
+  of `/idbfs` and carries the blocks it did not write across, but it decides
+  which those are by *name*: a hosted block called `save1` claims the file
+  spelling `/idbfs/save1` as its own, and a real file at that path would then be
+  dropped from every flush. `yandex/save1` cannot collide with anything the
+  player put in the mount.
+* **`getData(keys)` answers for the keys it was asked about, and only those that
+  exist.** That is the shape the page already handles — it tests
+  `if (data.save1)` and `if (data.counterFunny2)` — and it is what lets the
+  counter logic work: an absent key means "no cloud save yet", which is a
+  different answer from an empty string.
+
+`setData` writes synchronously. The SDK's second argument (`flush: false`) is
+about when *it* ships a buffered write to a server; a document write is already
+final, so there is nothing to defer.
+
+### 15.4 Ads and purchases: what has to be answered anyway
+
+A local copy has no ad service and no store, and the honest thing is to say so —
+once, not on every call. But "declined" is not the same as "ignored", and this
+is where a stand-in earns its keep:
+
+* `showRewardedVideo` **must fire the callbacks it was given**. The page sends
+  `AudioEnable(1)` from `onError` and from `onClose`, so a rewarded ad that is
+  simply dropped leaves the game waiting on a callback that never comes, with
+  its sound off. Declining means calling `onError` *and* `onClose`, and never
+  `onRewarded` — a reward reported without an ad is a weapon nobody watched
+  anything for.
+* `showFullscreenAdv` answers the same way, ending in `onClose(true)`, because
+  the game waits on the same `AudioEnable(1)` after an interstitial.
+* `getPurchases` and `getCatalog` resolve **empty** rather than rejecting. An
+  empty catalogue is what a store with no products looks like, and it keeps the
+  page's `initPurchasing()`/`checkShop()` on their normal path instead of their
+  `catch`. `purchase()` rejects, because nothing can be bought.
+
+### 15.5 What the two planes look like in one document
+
+One document, both planes, each block labelled by where it came from:
+
+```
+#plu-text-store 1
+#game funny-shooter-2
+#saved 2026-09-18T05:01:21.202Z
+@dir /idbfs/ce1bf5adf7086f02ef87178878e56f46
+@unity-prefs /idbfs/ce1bf5adf7086f02ef87178878e56f46/PlayerPrefs
+header	00010000001000
+unity.cloud_userid	str	f848ec9b30a4e45b28165bebec187cfc
+unity.player_session_count	str	2
+unity.player_sessionid	str	7580415709865497375
+@end
+@base64 /idbfs/ce1bf5adf7086f02ef87178878e56f46/savedataFunny2.dat
+…the game's own save file, which is binary, so it is kept as base64…
+@end
+@file yandex/counterFunny2
+7
+@end
+@file yandex/save1
+{"level":1,"isSounds":true,"isMusic":true,"language":1,"sensivity":2.0,…}
+@end
+@file yandex/save2
+{"attachmentsIndex":[{"lists":[-1,0,0]},…]}
+@end
+```
+
+Three things are worth noticing. The player's own tree is under an MD5
+directory, because that is what the Unity player creates; the game's own local
+file (`savedataFunny2.dat`) sits in it beside `PlayerPrefs`, and it is binary, so
+it is `@base64` rather than legible text. The SDK plane is two `@file` blocks
+named after the game's own keys, and those survive every flush the player makes.
+And the whole thing is one readable document — the point of the exercise — so an
+inspector can show both planes at once and an edit to either is a text edit.
+
+### 15.6 Verifying this conversion
+
+The usual steps of [section 16](#16-verifying-a-conversion), plus the second
+plane, which needs its own evidence because "the SDK wrote nothing" and "the SDK
+wrote it and nobody noticed" look the same from the outside.
+
+1. **Boot, and count the flows.** Zero requests leave the machine (15 requests,
+   all loopback, plus three blob URLs the page's own part-merger mints), the
+   guard refuses the player's analytics — `config.uca.cloud.unity3d.com` and
+   `cdp.cloud.unity3d.com/v1/events` — and there are no exceptions.
+2. **Prove which code path flushes.** Wrapping `PluStore.flush` from the page and
+   keeping the stack of each call separates the three patched sites: 244 calls
+   arriving through `_JS_FileSystem_Sync` (two wasm frames), 6 through the
+   periodic `fs.sync` tick, and **2 through `_SyncFiles`** — the game's own save
+   call, which is the one that would silently do nothing if site 3 were left
+   unpatched.
+3. **Round-trip an edit through the player's own encoder.** Write an extra entry
+   into the `@unity-prefs` block of the stored document, stop the sync tick
+   (`PluStore.flush = function () {}`), reload, and read the block back after the
+   player has rewritten the file. It decodes back with the injected entry
+   present *and* `unity.player_session_count` incremented from 1 to 2 — the
+   increment proves the player read and rewrote the file, and the surviving entry
+   proves the file was seeded from the document at boot rather than created
+   empty.
+4. **Compare the two planes against what the game was handed.** The page sends
+   the loaded save to the game with `SendMessage`, so wrapping `SendMessage`
+   records it. What the game received — a 796-character JSON object starting
+   `{"level":1,"isSounds":true,…}` — is byte-identical to the `yandex/save1`
+   block in the document. Both planes ran their real code: the game wrote them
+   itself, at boot, with no interaction.
+5. **Then the manual check.** Open
+   `http://127.0.0.1:5500/games/funny-shooter-2/index.html`, and confirm the game
+   reaches its menu and that a reload keeps its progress and its money.
+
+### 15.7 What the second conversion added
+
+Granny is the same host platform and the other shape: a build whose SDK use is
+**ads only**. Four things it settled that Funny Shooter 2 could not.
+
+**The glue can call the SDK itself.** Funny Shooter 2's page held the conversation
+— the game called `_CheckSave`/`_SaveCloud`, and the page called `YaGames`. In
+Granny the imports call the SDK *directly*, from inside the compiled glue:
+
+```js
+function _Yandex_GetDeviceType() {
+  YaGames.init().then(ysdk => {
+    myGameInstance.SendMessage("YandexAdManager", "MY_SetDeviceType", ysdk.deviceInfo.type)
+  })
+}
+function _Yandex_ShowInterstitial() { YaGames.init().then(ysdk => ysdk.adv.showFullscreenAdv({ callbacks: { /* … */ } })) }
+function _Yandex_ShowRewarded(value) { YaGames.init().then(ysdk => ysdk.adv.showRewardedVideo({ callbacks: { /* … */ } })) }
+```
+
+So `grep` the glue for the host's global before deciding a build does not need the
+SDK — the page is not where an SDK is always visible. Here the wrapper supplied
+`YaGames` from a third script (`sdk.js` off jsDelivr), which the page never names
+and never uses directly.
+
+**Check for a save plane before building one.** `getPlayer`, `getData` and
+`setData` appear nowhere in this build's SDK use — the only `getData`/`setData` in
+the file are the Web Audio and lazy-array ones, which is exactly the kind of
+false positive worth reading past. Granny's save is `PlayerPrefs` and nothing
+else, so the whole SDK plane here is device type and ads, and its stand-in stores
+nothing at all. Two builds on one platform, two different jobs.
+
+**Ads are answered, not dropped — and never rewarded.** `onOpen` is the game's
+resume signal, not decoration: the glue turns it into `MY_AdOpenedSuccess`, and a
+build whose ad request is silently ignored is a build that stops advancing after
+the first interstitial. So a declined ad fires `onOpen` and then `onClose`, and
+`onRewarded` — which sends `MY_GetAward` — never fires, because a reward without
+an ad is free currency. Driving the glue's own callbacks through the stand-in
+produces exactly that: `MY_AdOpenedSuccess` twice, `MY_GetAward` zero times.
+
+**The host SDK is a third-party script even when the page does not look like one.**
+This wrapper's ad path had two SDKs wired into it, and both were dead in different
+ways. The GameMonetize loader it injects (`sedk.js`) does not exist in its own
+repository — jsDelivr answers the literal text `Couldn't find the requested file
+/sedk.js in testamalame/sef.` — so the `sdk` global it was fetched to define
+never appeared, and the page's `sdk.showBanner()` guard never passed. And
+`sdk.js` from the other repo, which the decoration around it (`SDK_OPTIONS`,
+`onEvent`, `SDK_GAME_PAUSE`) describes as a GameMonetize SDK, is in fact the
+Yandex SDK: it ends by assigning `window.YaGames`. Both are gone; the glue's
+device type and ads now come from the local stand-in, and Granny's folder holds
+no SDK at all.
+
+**The control run is the argument.** The wrapper as committed, in the same
+headless browser as the converted page:
+
+| | the wrapper | converted |
+|---|---|---|
+| requests off the machine | **157** — 152 to `cdn.jsdelivr.net`, 5 to Unity telemetry (`config.uca`, `cdp.cloud`) | **0** |
+| exceptions | 11, most of them `No parent to post message` from the SDK's handshake | 2 |
+| the 2 that remain | `EncodingError: Unable to decode audio data` | the same two |
+
+The two shared exceptions are the headless browser refusing two of the game's
+MP3s, not the conversion: they appear identically on the CDN build, and the game
+still reaches its menu and loops its menu music. Running the before-picture is
+worth the ten minutes it takes, because "no errors" is not a claim a conversion
+can make on its own — it is a comparison.
+
+Three smaller notes from this build:
+
+* **148 files, 73.8 MB**, pulled from two pinned commits and verified twice: byte
+  length against the GitHub tree, and the git blob hash (`sha1("blob <len>\0" +
+  content)`) against the tree's own blob sha. A CDN serving something other than
+  the tree describes fails here rather than at a black screen.
+* **Its own save keys are visible in the document**, which is the cheapest way to
+  see what a Unity game keeps: `DiffData`, `EffectsOnOff`, `GameVolume`,
+  `NightMareOnOff`, `UnityGraphicsQuality`, `fogOnExtreme`, `graphSettings`,
+  `musikOnOff` — one of them a **float**, so the codec's 0xFD tag is in live use
+  ([section 19](#19-reference)).
+* **The game overwrites its own keys at boot.** Injecting an unknown entry proves
+  the round trip (it survives the player's rewrite, and
+  `unity.player_session_count` increments 1 → 2 beside it), but the same edit to
+  `GameVolume` does *not* survive: the game reads its settings at startup and
+  writes its own value back. Test the round trip with a key no game code owns
+  ([section 20](#20-known-limits)).
+
+### 15.8 When the page will not start: make it name the file
+
+Unity's loader reports a bad copy of the build with three messages, none of which
+name the file that is actually wrong:
+
+```
+Failed to download file <url>
+Unable to parse <url>, The file is corrupt, or compression was misconfigured?
+Unable to load file <url>! Check that the file exists on the remote server.
+```
+
+All three are the *same* symptom — the folder is not in the shape this page
+expects — and each one has a different cause worth distinguishing: the patched
+glue missing, a stale cached copy of the original being served instead, or a data
+part missing so the merger never completes. A page that hands these straight to
+`alert()` sends the reader off to debug a web server that is fine.
+
+So the page checks its own glue **before** Unity's loader is asked for anything.
+`frameworkUrl` must be the patched copy served as plain JS, and the check is a
+`fetch(..., { cache: 'no-cache' })` of it that then reads the first bytes:
+
+```js
+fetch(config.frameworkUrl, { cache: "no-cache" }).then(res => {
+  if (!res.ok) throw new Error(config.frameworkUrl + " answered HTTP " + res.status);
+  return res.arrayBuffer();
+}).then(bytes => {
+  const head = new Uint8Array(bytes.slice(0, 3));
+  if (head[0] === 0x6b && head[1] === 0x8d && head[2] === 0x00)
+    throw new Error(config.frameworkUrl + " is a compressed container — this is the original glue, or a cached copy of it, not the patched one.");
+  if (!/function unityFramework/.test(new TextDecoder().decode(bytes.slice(0, 4096))))
+    throw new Error(config.frameworkUrl + " does not define unityFramework — it is not the glue.");
+});
+```
+
+Three things make this worth copying to every Unity page:
+
+* **`6b 8d 00` is the container marker** the loader sniffs ([
+  section 6.2](#62-find-the-patch-points-in-the-build)). A stale cached copy of
+  the original, or a folder where the untouched `.unityweb` was renamed to the
+  `.js` name, both read exactly like this — and this is the one check that says so
+  in words.
+* **`cache: "no-cache"` revalidates while it checks**, so a browser that cached
+  the wrong glue replaces it with the real one on the next load instead of
+  failing again. `no-cache` revalidates; `no-store` would throw the cache away
+  every load, which is needless for a 1 MB file.
+* **The failure is printed on the page, not alerted.** `reportProblem()` hides
+  the loading cover and writes the headline and the detail into a `div`, and also
+  `console.error`s it. An `alert()` can be dismissed before the reader has read it,
+  and disappears from the record entirely.
+
+The merger needs the same treatment from the other end, because a **missing
+data part used to hang silently**: the intercepted request was left unanswered, so
+the player sat on the loading cover for ever with the only clue in the console.
+The fallback is to ask for the original URL and let it 404, so the loader reports
+it the way it reports any missing file, *and* to call `reportProblem()` with the
+part's name.
+
+Four copies of the folder, each wrong in a different way, verify it — sabotaging
+the *server* rather than the working tree, so the files on disk stay as shipped:
+
+| served as | page shows |
+| --- | --- |
+| as shipped | the game, cover hidden, no panel |
+| glue 404 | `FunnyShooter2_Yandex.framework.js answered HTTP 404` + the folder note |
+| `.unityweb` served under the `.js` name | `is a compressed container — this is the original glue, or a cached copy of it` + a hard-reload hint |
+| `.part1` 404 | `<name> could not be assembled from its parts`, and Unity's own `request failed with status: 404` behind it |
+
+---
+
+## 16. Verifying a conversion
 
 Do all five. The first two catch a patch that silently did nothing, which is the
 failure mode that looks like success. The engine-specific half of each step is
@@ -2415,7 +2837,9 @@ where the work is: [section 11.5](#115-verifying-a-web-storage-conversion) for a
 `localStorage` engine, [section 10.5](#105-verifying-a-godot-conversion) for a
 Godot export, [section 12.8](#128-verifying-a-playables-conversion) for a host SDK,
 [section 14.8](#148-verifying-a-flash-conversion) for a Flash movie, and the notes
-at the end of sections 6–9 for the rest.
+at the end of sections 6–9 for the rest. A build with a second storage plane
+needs [section 15.6](#156-verifying-this-conversion) as well as its engine's note,
+because neither plane's evidence says anything about the other.
 
 1. **The document appears.** `localStorage` holds one key, and it is readable
    text: `localStorage.getItem('plu:text:<game>')`.
@@ -2522,7 +2946,7 @@ Two things Big NEON Tower made worth doing on top of that:
 
 ---
 
-## 16. Inspecting a save
+## 17. Inspecting a save
 
 There is nothing to install. The save is one plain-text string, and it is read
 through the same API that wrote it:
@@ -2541,7 +2965,7 @@ PluStore.on(function (doc) { ... }) // every write, as it happens
 Under the default backend that document lives in `localStorage` under
 `plu:text:<game>`, so a browser's own devtools read it as well (Application →
 Local Storage), and `PluStore.backends.<name>` decides where else it can live
-([section 17](#17-backends)).
+([section 18](#18-backends)).
 
 What a block holds, by engine:
 
@@ -2563,7 +2987,7 @@ Three decodes are worth doing by hand rather than reading raw:
   when the game stored `128` is a different save, not a formatting choice
   ([section 8.7](#87-store-values-carry-a-type-tag)).
 - **A `@unity-prefs` block.** `PluStore.prefs()` decodes it, and the seven header
-  bytes are carried through untouched ([section 18](#18-reference)).
+  bytes are carried through untouched ([section 19](#19-reference)).
 
 The document only changes through `set()` ([section 2](#2-the-contract)), so an
 edit made by hand is inert until the page reloads — and for an engine whose flush
@@ -2573,7 +2997,7 @@ before editing anything into a running page.
 
 ---
 
-## 17. Backends
+## 18. Backends
 
 The document is a string, and where it lives is a separate decision. A backend
 is any object with three methods:
@@ -2594,7 +3018,7 @@ needs to change.
 
 ---
 
-## 18. Reference
+## 19. Reference
 
 ### API
 
@@ -2654,7 +3078,7 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-## 19. Known limits
+## 20. Known limits
 
 - **A Flash save is named by the player, host and all.** Ruffle keys a
   SharedObject `<domain><path>/<movie>.swf/<name>`, so the address the page was
@@ -2662,6 +3086,13 @@ is what makes a re-encode safe to hand back.
   would be two saves ([section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)).
   `installSharedObjects(movie)` narrows it, and the movie argument is not
   optional bookkeeping: leave it out and the save follows the hostname again.
+- **A game can own the key you edit.** A round trip is proven with a key no game
+  code touches — after the reload the player rewrites its file, and an injected
+  unknown entry survives that, which is what says the file was seeded from the
+  document. Edit a key the *game* writes and it may not survive at all: Granny
+  reads its settings at boot and writes its own `GameVolume` back over the stored
+  one, so an edit there proves nothing either way
+  ([section 15.7](#157-what-the-second-conversion-added)).
 - **A Flash save is written on the player's schedule.** Ruffle flushes a
   SharedObject on its own tick and once more as the page goes away, so
   `fileWrites` counts a boot rather than a save, and a hand edit made while the
@@ -2671,7 +3102,15 @@ is what makes a re-encode safe to hand back.
   The player picks its wasm by probing for WebAssembly extensions, so the pair a
   current browser does not use still has to ship, and `player.load()` has to be
   given a real movie rather than the placeholder a wrapper may carry.
-
+- **A host platform's services cannot be reproduced, only stood in for.** Ads,
+  purchases, leaderboards and cross-device cloud sync all live behind the SDK's
+  handshake with its own parent frame, and a local copy has no parent frame. What
+  can be kept is the game's *save*, because that is the SDK's player data and it
+  is a handful of named strings — the stand-in stores those in the document
+  ([section 15](#15-yandex-games)). Everything else has to be answered with an
+  honest no, and *answered* rather than ignored, because the game is waiting on
+  the callbacks: a rewarded ad that fires neither `onError` nor `onClose` is a
+  game left with its audio switched off
 - **Fancade writes its mount back when its page goes away.** The player flushes the
   whole of `/sandbox` on unload, so clearing or replacing the document while an old
   player is still alive lets its dying flush put the old save straight back — park
