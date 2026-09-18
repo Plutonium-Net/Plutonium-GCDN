@@ -500,6 +500,73 @@ a sign that an old save was migrated. Cluster Rush's own keys — `UnlockedLevel
 
 ---
 
+### 6.7 Refuse a request, and answer it
+
+A local-only guard must **answer** the requests it blocks, never break them. This
+is not a style preference: it is the difference between a game that works and a
+game that shows an error screen, and it cost real time to find.
+
+**What happens when a blocked request comes back as an error.** The player's own
+C# makes `UnityWebRequest`s, and when one of those fails, the managed code can
+throw inside `main()` — and an unhandled exception in a WebGL player calls
+Emscripten's `abort()`. The result is a **dead runtime**, `abort(53)` with a stack
+that ends at `_main`, and a rejected `createUnityInstance` promise, so the page
+shows a startup error instead of a game. Refusing telemetry with `abort()` plus a
+synthetic `error` event, or with `Promise.reject`, is exactly enough to trigger
+it.
+
+The reason this is easy to miss: **it does not happen on the first visit.** It
+took three visits in one browser profile to reproduce, presumably because the
+player decides per session what to report. So it reads as "this game broke
+lately" rather than "the guard is a bug".
+
+**And the refusal has to keep a method that a URL can serve.** A `blob:` URL can
+be read but not posted to, so a blocked POST that keeps its method comes back
+`status 0` — an error again, and the same `abort(53)`. The method has to be
+rewritten along with the URL:
+
+```js
+XMLHttpRequest.prototype.open = function (method, url) {
+  if (!allowed(url)) {
+    refuse('a request', url);
+    this.pluBlocked = URL.createObjectURL(new Blob([], { type: 'application/octet-stream' }));
+    /* GET, not the caller's method: a blob URL is readable, not postable. */
+    return open.apply(this, ['GET', this.pluBlocked].concat(
+      Array.prototype.slice.call(arguments, 2)));
+  }
+  return open.apply(this, arguments);
+};
+XMLHttpRequest.prototype.send = function () {
+  if (this.pluBlocked) return send.call(this);      /* no body is forwarded */
+  return send.apply(this, arguments);
+};
+```
+
+The other two entry points are the same idea: `fetch` resolves with
+`new Response(new Blob([]), { status: 200 })` instead of rejecting, and
+`sendBeacon` returns `true` without sending. The caller sees a well-formed empty
+answer — what an offline machine looks like — and nothing leaves the machine
+either way. Every refusal is logged, and the page keeps the list in
+`window.pluRefused` so a panel about a crash can name the URLs involved.
+
+**Three guards, one profile, three visits each** is what settled it, in a
+*headful* browser:
+
+| guard | visits 1–2 | visit 3 |
+| --- | --- | --- |
+| blocked request → `abort()` + `error` event | boot | `abort(53)` |
+| blocked request → empty blob, method kept (`POST` → `status 0`) | boot | `abort(53)` |
+| blocked request → empty blob as `GET` (200) | boot | boot |
+
+**A headless browser never reproduced the abort** — the same three visits in
+`--headless=new` booted every time — so this is one to check in a real window.
+What to look at: `document.getElementById('plu-startup-error')` must stay
+absent, every blocked request must log status **200**, and nothing may log `0`.
+Cluster Rush and the other converted pages in [section 11](#11-web-storage-localstorage)
+use the same guard, so the rule is theirs too.
+
+---
+
 ## 7. GameMaker HTML5
 
 A GameMaker Studio 2 HTML5 export keeps its save in `localStorage`, but not
@@ -2826,6 +2893,15 @@ the *server* rather than the working tree, so the files on disk stay as shipped:
 | glue 404 | `FunnyShooter2_Yandex.framework.js answered HTTP 404` + the folder note |
 | `.unityweb` served under the `.js` name | `is a compressed container — this is the original glue, or a cached copy of it` + a hard-reload hint |
 | `.part1` 404 | `<name> could not be assembled from its parts`, and Unity's own `request failed with status: 404` behind it |
+
+**The guard is the other half of starting at all.** This build's blocked requests
+are its own telemetry: `config.uca.cloud.unity3d.com` fetched with GET, and
+`cdp.cloud.unity3d.com/v1/events` **posted to**. The POST is the one that mattered
+— as [section 6.7](#67-refuse-a-request-and-answer-it) explains, a blocked POST
+that keeps its method fails against a blob URL, the player's managed startup code
+throws, and the runtime dies with `abort(53)` on the third visit in a profile
+rather than the first. Answering blocked requests with an empty 200, method
+rewritten, is what makes the page start every time.
 
 ---
 
