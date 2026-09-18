@@ -1,18 +1,10 @@
-<Module>
-
-
-<!-- Pluto Game 9/11/2026 -->
-
-
-
-<Module>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="../../js/sync.js"></script>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>really cool flash game</title>
+  <title>Duck Life 2: World Champion</title>
   <style>
     html, body {
       margin: 0;
@@ -35,30 +27,10 @@
       background: black;
       z-index: 10;
     }
-    #box-top {
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 0;
-    }
-    #box-bottom {
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 0;
-    }
-    #box-left {
-      top: 0;
-      left: 0;
-      width: 0;
-      height: 100%;
-    }
-    #box-right {
-      top: 0;
-      right: 0;
-      width: 0;
-      height: 100%;
-    }
+    #box-top    { top: 0;    left: 0;  width: 100%; height: 0; }
+    #box-bottom { bottom: 0; left: 0;  width: 100%; height: 0; }
+    #box-left   { top: 0;    left: 0;  width: 0;    height: 100%; }
+    #box-right  { top: 0;    right: 0; width: 0;    height: 100%; }
     ruffle-player {
       width: 100%;
       height: 100%;
@@ -66,8 +38,81 @@
       display: block;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
-  
+
+  <!-- The save. Ruffle keeps every Flash save - a SharedObject - in localStorage:
+       its wasm carries a `ruffle_web::storage::LocalStorageBackend` and reaches
+       the browser through `window.localStorage`. Swapping the area before Ruffle
+       initialises is therefore the whole conversion, the same shape as any other
+       Web Storage engine (STORAGE.md section 11, and section 14 for this one).
+
+       The movie asks for `SharedObject.getLocal("mydata")`, the same slot name
+       Duck Life 1 used, but Ruffle names a slot after the movie's own URL -
+       "127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata" - so the host the page
+       was opened from would otherwise be part of the save's name. Naming the
+       movie narrows that to "duck-life-2.swf/mydata".
+
+       This has to come before `ruffle.min.js`, because the player reads a movie's
+       save as it loads it. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'duck-life-2' });
+    var storage = PluStore.installSharedObjects('duck-life-2.swf');
+    if (!storage) {
+      console.error('Duck Life 2: window.localStorage could not be swapped - ' +
+        'the save would go to the browser store instead of the document');
+    }
+
+    /* Nothing on this page may leave the machine. Unlike Duck Life 1 this build
+       carries no MochiAds stub, but it does carry a CPMStar ad spot
+       (`server.cpmstar.com`) and a set of Bubblebox / Newgrounds / GameShed
+       tracking URLs that it pings on screen transitions, plus a GameShed
+       achievement API. All of them live *inside the SWF*, so there is nothing to
+       delete in a script; refusing the request changes nothing the game does -
+       none of those hosts answers a plain request without CORS headers today
+       anyway - it only stops the page from telling third parties that the game
+       was opened. Ruffle fetches through `window.fetch` and never through
+       XMLHttpRequest, so that one call is the whole surface. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
+
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        if (refused.indexOf(url) < 0) {
+          refused.push(url);
+          console.warn('Duck Life 2: refused a request outside this folder: ' + url);
+        }
+        return Promise.reject(new TypeError('Duck Life 2: only this folder is reachable (' + url + ')'));
+      };
+    })();
+  </script>
+
+  <!-- Ruffle, vendored from the release this page already pinned
+       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
+       beside it) with the core glue and the wasm it fetches from this folder at
+       run time. The published page took ruffle.min.js from jsDelivr and carried
+       the save off through js/sync.js; neither is here any more.
+
+       Both core pairs are kept, and both are needed: ruffle.min.js probes
+       WebAssembly.validate() for SIMD and four other extensions and loads
+       core.ruffle.ae105... + f7f28e....wasm when all five are present, falling
+       back to core.ruffle.9085... + 4d8824....wasm otherwise ("falling back to
+       the vanilla WebAssembly module"). A browser without SIMD is 13 MB of unused
+       files; a browser without the pair it needs has no player at all. -->
+  <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>
   <div id="flash-container"></div>
@@ -76,56 +121,55 @@
   <div class="black-box" id="box-left"></div>
   <div class="black-box" id="box-right"></div>
   <script>
-    const container = document.getElementById("flash-container");
-    const boxTop = document.getElementById("box-top");
-    const boxBottom = document.getElementById("box-bottom");
-    const boxLeft = document.getElementById("box-left");
-    const boxRight = document.getElementById("box-right");
-    
+    const container = document.getElementById('flash-container');
+    const boxTop = document.getElementById('box-top');
+    const boxBottom = document.getElementById('box-bottom');
+    const boxLeft = document.getElementById('box-left');
+    const boxRight = document.getElementById('box-right');
+
     function resizeGame() {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
       const aspectRatio = 5.5 / 3;
-      
+
       let width = Math.floor(windowWidth * 1);
       let height = Math.floor(width / aspectRatio);
-      
+
       if (height > windowHeight * 1) {
         height = Math.floor(windowHeight * 1);
         width = Math.floor(height * aspectRatio);
       }
-      
+
       container.style.width = `${width}px`;
       container.style.height = `${height}px`;
-      
+
       const topMargin = (windowHeight - height) / 2;
       const leftMargin = (windowWidth - width) / 2;
-      
+
       boxTop.style.height = `${topMargin}px`;
       boxBottom.style.height = `${topMargin}px`;
       boxLeft.style.width = `${leftMargin}px`;
       boxRight.style.width = `${leftMargin}px`;
     }
-    
-    window.addEventListener("resize", resizeGame);
-    window.addEventListener("DOMContentLoaded", () => {
+
+    window.addEventListener('resize', resizeGame);
+    window.addEventListener('DOMContentLoaded', () => {
       resizeGame();
       const ruffle = window.RufflePlayer?.newest() || window.RufflePlayer?.createPlayer();
       if (ruffle && container) {
         const player = ruffle.createPlayer();
-        player.style.width = "100%";
-        player.style.height = "100%";
-        player.style.background = "black";
+        player.style.width = '100%';
+        player.style.height = '100%';
+        player.style.background = 'black';
         container.appendChild(player);
-        player.load("$1");
+        /* The published page called player.load("$1"). Its wrapper was never
+           filled in, so Ruffle was handed a four-character string where a movie
+           belongs, and nothing ever started. */
+        player.load('duck-life-2.swf');
       } else {
-        container.textContent = "Ruffle failed to load."; 
+        container.textContent = 'Ruffle failed to load.';
       }
     });
   </script>
-    <param name="movie" value="https://cdn.jsdelivr.net/gh/markrosenbaum/some-repo@aeb3030a3fb90987658ff4ee1063c64f6206152f/dl2/ducklife2worldchampion.swf">
-    <embed src="https://cdn.jsdelivr.net/gh/markrosenbaum/some-repo@aeb3030a3fb90987658ff4ee1063c64f6206152f/dl2/ducklife2worldchampion.swf" width="100%" height="100%">
 </body>
 </html>
-]]></Content>
-</Module>
