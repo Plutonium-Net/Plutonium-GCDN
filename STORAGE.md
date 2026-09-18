@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — sixteen games are on PluStore
-   so far, and 17 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — seventeen games are on PluStore
+   so far, and 16 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -2263,8 +2263,8 @@ next boot and survived there.
   confirm both that Ruffle is handed exactly those bytes and that the game's own
   variables keep them.
 
-Seven further Ruffle wrappers are in this repo still on the old bridge
-(`duck-life-3`, `learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
+Six further Ruffle wrappers are in this repo still on the old bridge
+(`learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
 `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the same three
 things: the player vendored, `installSharedObjects('<movie>.swf')` before it, and
 the movie named correctly.
@@ -2311,7 +2311,99 @@ the area that lands on `window.localStorage` is the one installed inside it, so
 nothing that plays the game ever touches the wrapper. Since the wrapper is a
 `Proxy` around the real area, PluStore's own `window.localStorage !== area` check
 fails while it is in place and prints *"the save would not be ours"*. That warning
-is the probe's, not the page's — remove the wrapper and it goes away.
+is the probe's, not the page's — remove the wrapper and it goes away. Catching the
+`PluStore` global instead *does* work, and is the technique
+[section 14.10](#1410-what-the-third-conversion-added) uses.
+
+### 14.10 What the third conversion added
+
+**A build can gate its own start behind a dead ad network and still start.** Duck
+Life 3 is that build, and it is worth spelling out because it looks like the
+conversion failed. It carries the whole MochiAds preloader inside the movie and
+traces `MochiServices Connecting...` and `Waiting for MochiAds services to
+connect...` on every boot; it loads
+`server.cpmstar.com/adviewas2.swf?contentspotid=4553QE607156B` into a clip named
+`adBox` after `System.security.allowDomain('server.cpmstar.com')` so the ad can
+script the game; and it also carries `x.mochiads.com/srv/1/`, `MochiLC.swf`, a
+`link.mochiads.com/linkping.swf` ping, a Kongregate referral and a
+`kongregate.stats.submit`. None of those hosts answers today. Measured both ways:
+with the abandoned ad client served locally from the Wayback Machine's 2014 copy
+of `services.swf`, the handshake *does* complete — the movie logs
+`[SERVICES_API] connected!` and `REGISTER GAME …`, and the client writes its own
+`services.mochiads.com` SharedObject — and the game then sits in exactly the same
+place; with everything off-machine refused it is unaffected and the save arrives
+all the same. So there is no ad shim in this repo: the guard stays a plain
+refusal. (The client is a real thing to run if a build genuinely needs it: it
+reads `listenLC` back off **its own URL**, so serving it without the query string
+that the game asks for gives a client that loads, runs and never connects — it
+wrote its state and paged in none of its modules. Handing a stand-in to
+`loadMovie` also needs a real URL, not a synthesized response: Ruffle derives a
+loaded movie's base from where it was fetched, and without one every relative load
+inside it fails with *relative URL without a base*.)
+
+**The opening screens have to be clicked through, and the clicking needs a noise
+floor.** A fresh boot renders, animates and never touches storage for minutes: no
+read, no write, an empty document. The screen animates by itself — about 7.5% of
+the frame's pixels differ between two untouched frames 1.5 s apart — so a click
+test with a fixed threshold calls every click a hit and none of them
+meaningful. Compare each click against the *local* idle noise taken just before
+it (a hit is a change of more than 2.5× that); in a 1280×800 window the points
+that answered were `(722,559)`, `(1083,559)`, `(632,628)`, `(993,628)`, `(900,590)`,
+`(400,590)` and `(540,540)`, and the save appears after roughly six of them. That
+is the same lesson as [section 14.9](#149-what-the-second-conversion-added) - a
+conversion cannot be judged before the game is played - with teeth on it: here
+nothing looked broken, the movie was simply waiting for a click.
+
+**The save is the same slot name as its two siblings**, `mydata`, with a wider
+field list, read straight off the movie's own constant pools next to its
+`SharedObject.getLocal("mydata") … flush()` calls (of which there are some 170):
+`stalvl clilvl runlvl flylvl swilvl money race maxi maxmaxi namee dt strf sthf
+athf flyf swif a1 … a10`. The conversion itself is the usual three lines, with
+`PluStore.installSharedObjects('duck-life-3.swf')` so the key does not move with
+the host.
+
+**The proof, in the area's own log.** A fresh boot gives
+
+    GET[127.0.0.1/games/duck-life-3/duck-life-3.swf/mydata] -> undefined
+    SET[127.0.0.1/games/duck-life-3/duck-life-3.swf/mydata] <- 56 chars
+
+The movie asks a second time on a later boot with the same profile, and is handed
+the stored body:
+
+    GET[127.0.0.1/games/duck-life-3/duck-life-3.swf/mydata] -> 56 chars
+
+The document it came out of holds exactly one block, `duck-life-3.swf/mydata`, and
+its bytes survive a reload unchanged. Note the key in the log is Ruffle's own —
+`<host>/games/duck-life-3/<movie>.swf/mydata` — because that is the name the
+player asks for; the mapper is what turns it into `duck-life-3.swf/mydata` on the
+way in and back again on the way out.
+
+Catching the global is what makes that log possible. The hook has to be in place
+*before* the page calls `installSharedObjects`, so it wraps the method on the
+global as the global is assigned:
+
+```js
+var real = null;
+Object.defineProperty(window, 'PluStore', {
+  configurable: true,
+  get: function () { return real; },
+  set: function (v) {
+    real = v;
+    var orig = v.installSharedObjects.bind(v);
+    v.installSharedObjects = function (movie) {
+      var area = orig(movie);              // the identity check already passed
+      Object.defineProperty(window, 'localStorage', {
+        value: new Proxy(area, handlers),  // in place before Ruffle reads it
+        configurable: true, writable: true
+      });
+      return area;
+    };
+  }
+});
+```
+
+as `plustore.js` publishes with `global.PluStore = PluStore`, that assignment goes
+through the setter, and the wrapper sees every read and write the movie makes.
 
 ---
 

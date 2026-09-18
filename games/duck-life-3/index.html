@@ -62,18 +62,26 @@
         'the save would go to the browser store instead of the document');
     }
 
-    /* Nothing on this page may leave the machine. This build carries more of the
-       old ad-stack than Duck Life 1 does: MochiAds (`MochiServices`, which wants
-       www.mochiads.com/static/lib/services/, `MochiLC.swf` and a
-       `link.mochiads.com/linkping.swf` ping), a CPMStar ad spot
-       (`server.cpmstar.com/adviewas2.swf`), a Kongregate referral link and a
-       `kongregate.stats.submit` call, plus wixgames.co.uk branding. All of it
-       lives *inside the SWF*, so there is nothing to delete in a script - and
-       none of those hosts answers a plain request without CORS headers today, so
-       refusing them changes nothing the game does; it only stops the page from
-       telling four third parties that the game was opened. Ruffle fetches through
-       `window.fetch` and never through XMLHttpRequest, so that one call is the
-       whole surface. */
+    /* Nothing on this page may leave the machine. This build carries the whole
+       old ad-stack inside the SWF, so there is nothing to delete in a script:
+       MochiAds (`MochiServices`, which wants
+       www.mochiads.com/static/lib/services/services.swf?listenLC=... and its
+       MochiLC.swf), a CPMStar spot (`server.cpmstar.com/adviewas2.swf`, loaded
+       into `adBox` with `System.security.allowDomain('server.cpmstar.com')` so
+       the ad can script the game), a Kongregate referral link and a
+       `kongregate.stats.submit` call, plus wixgames.co.uk branding. Every one of
+       those hosts is gone; refusing them costs the game nothing it can still
+       get. Ruffle fetches through `window.fetch` and never through
+       XMLHttpRequest, so that one call is the whole surface.
+
+       Worth knowing, because it looks like a dead end and is not one: the movie
+       *is* a MochiAds-gated preloader - it traces "MochiServices Connecting..."
+       and "Waiting for MochiAds services to connect..." - but it starts anyway
+       without the ad client, once its opening screens have been clicked through.
+       A boot makes 10 requests, all of them this folder, and the save below
+       still arrives. (Serving the abandoned ad client from the Wayback Machine
+       was tried and made no difference to whether the game ran; STORAGE.md 14.9
+       keeps the measurements.) */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -166,8 +174,15 @@
         container.appendChild(player);
         /* The published page called player.load("$1"). Its wrapper was never
            filled in, so Ruffle was handed a four-character string where a movie
-           belongs, and nothing ever started. */
-        player.load('duck-life-3.swf');
+           belongs, and nothing ever started.
+
+           The absolute URL is deliberate: this movie loads a second movie by a
+           relative name of its own (MochiAds' preloader), and a movie handed
+           over as a bare relative path gives Ruffle no base to resolve that
+           against - it reports "relative URL without a base" and the load goes
+           nowhere. Naming the movie absolutely costs nothing in the save: the
+           key mapper strips everything before `<movie>.swf/`. */
+        player.load(new URL('duck-life-3.swf', location.href).href);
       } else {
         container.textContent = 'Ruffle failed to load.';
       }
