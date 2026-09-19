@@ -137,7 +137,10 @@
     function resizeGame() {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
-      const aspectRatio = 5.5 / 3;
+      /* The movie is 720x540 — 4:3. The wrapper this page replaces carried
+         5.5/3 from the shared template, which stretched the picture to fill a
+         wider box; the sibling conversion uses the movie's own ratio. */
+      const aspectRatio = 4 / 3;
 
       let width = Math.floor(windowWidth);
       let height = Math.floor(width / aspectRatio);

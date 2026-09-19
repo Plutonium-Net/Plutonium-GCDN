@@ -133,7 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
-| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/) and [section 14](#14-flash-ruffle) |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" (or, when the movie names no movie in the key, the host dropped so the rest is fixed text) | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/), [`games/learn-to-fly-3/`](games/learn-to-fly-3/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — twenty-one games are on PluStore
-   so far, and 12 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — twenty-two games are on PluStore
+   so far, and 11 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -2201,9 +2201,9 @@ stripped prefix.
 
 ## 14. Flash (Ruffle)
 
-`games/duck-life/`, `games/duck-life-2/`, `games/learn-to-fly/` and
-`games/learn-to-fly-2/` are Flash builds — one `.swf` each, played by Ruffle, a
-WASM Flash player. Nothing inside a movie is patched — this is the shortest
+`games/duck-life/`, `games/duck-life-2/`, `games/learn-to-fly/`,
+`games/learn-to-fly-2/` and `games/learn-to-fly-3/` are Flash builds — one `.swf`
+each, played by Ruffle, a WASM Flash player. Nothing inside a movie is patched — this is the shortest
 conversion in the document — but two things about Ruffle are not obvious: the key
 its saves are named by, and the fact that its save is already `localStorage`. Each
 later game is written up alongside the first because it taught something the
@@ -2215,7 +2215,9 @@ start behind a dead ad network and still start),
 [section 14.11](#1411-what-the-fourth-conversion-added) (the exact byte layout of
 a save, and why a Learn-to-Fly-family round trip may prove only equivalence), and
 [section 14.12](#1412-what-the-fifth-conversion-added) (a save whose fields are
-objects rather than numbers, and a movie that hands the seeded values back).
+objects rather than numbers, and a movie that hands the seeded values back), and
+[section 14.13](#1413-what-the-sixth-conversion-added) (a movie that puts *no
+movie name* in its key at all, so the mapper has to narrow a different part).
 
 ### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
 
@@ -2415,11 +2417,10 @@ next boot and survived there.
   confirm both that Ruffle is handed exactly those bytes and that the game's own
   variables keep them.
 
-Four further Ruffle wrappers are in this repo still on the old bridge
-(`learn-to-fly-3`, `motox3m-3`,
-`the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the same three
-things: the player vendored, `installSharedObjects('<movie>.swf')` before it, and
-the movie named correctly.
+Three further Ruffle wrappers are in this repo still on the old bridge
+(`motox3m-3`, `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the
+same three things: the player vendored, `installSharedObjects('<movie>.swf')`
+before it, and the movie named correctly.
 
 ### 14.9 What the second conversion added
 
@@ -2668,6 +2669,83 @@ the first 8 bytes before its constant pool is legible. Ruffle is the same vendor
 release, and the slot name is `mainprofile` — read off the constant pool, where
 `mainprofile`, `SharedObject`, `getLocal`, `data` and `flush` sit together, and
 confirmed by the document's own key.
+
+### 14.13 What the sixth conversion added
+
+Learn to Fly 3 is the sixth Ruffle conversion, the third of the family, and the
+first Flash save in this document whose **key contains no movie name at all** —
+which turned a page conversion into a small change to the shared library.
+
+**A movie can put a path in its key, not a movie.** Its siblings call
+`getLocal("mydata")`; this one is AS3 and calls
+`getLocal("LearnToFly3/profileData", "/")` — a name *and* a `localPath`. Ruffle
+composes its key from whichever it was given, and for a localPath it uses that
+path instead of the movie's own location, so what reaches the area is
+
+    127.0.0.1//#LearnToFly3/profileData
+
+There is no `learn-to-fly-3.swf` anywhere in it, so the `byMovie` narrowing every
+other Flash page relies on cannot match — `installSharedObjects('learn-to-fly-3.swf')`
+is handed a key with nothing to narrow, and the save lands in the document under a
+name that still moves with the host. The mapper gained a second shape: try the
+movie first, and if it is not there drop the **host** instead, because the host is
+the only part of such a key that changes with the address. What is left is fixed
+text — `/#LearnToFly3/profileData` — and the documenting comment in
+[`js/plustore.js`](js/plustore.js) now names the shape. `hostSpelling` reconstructs
+Ruffle's own spelling for anything that enumerates the key space (`key(i)`,
+`Object.keys`), so nothing sees a name it does not recognise, and a bare key from
+something that is not Ruffle is left alone rather than decapitated.
+
+**The mapper was proved on both hosts, and the movie-shaped path did not move.**
+Run against `127.0.0.1` and again against `localhost`, the same probe
+([section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)) seeded
+`/#LearnToFly3/profileData`, read it back through Ruffle's `127.0.0.1//…` spelling
+and the `localhost//…` spelling alike (both `SEED-A`), read a Duck Life-shaped
+`<host>/games/duck-life/duck-life.swf/mydata` through its own key (both `SEED-B`),
+wrote and read and deleted through property assignment (Ruffle's real verbs), and
+left a plainly-named key intact. The regression game agrees end to end: Duck Life
+still boots clean, a seeded `duck-life.swf/mydata` survives a reload, and playing
+made the movie write seven times into the document with zero off-machine requests
+and no exceptions — the movie-shaped key is untouched by the fix.
+
+**The read is proven; the write is equivalence, as for its first sibling.** Ruffle
+reaches the area by property read and `ownKeys` rather than the methods, so the
+boundary is instrumented at install time, and it shows one logged operation: a
+read of `127.0.0.1//#LearnToFly3/profileData` that **hit** the seeded document
+value and returned it. The movie's surface here is a single read, and a control
+settled whether that is the conversion's doing: the *same page on the browser's
+own `localStorage`*, no PluStore, logs the same single read and leaves the real
+store empty. This movie never writes in a headless boot with input driven at it,
+with or without the conversion, so — exactly like Learn to Fly
+([section 14.11](#1411-what-the-fourth-conversion-added)) — what can be claimed is
+the read boundary and equivalence, not a game-level write. The write path is proven
+at that boundary instead: a property write through Ruffle's spelling lands under
+the narrowed key, reads back, and deletes (the probe above).
+
+**Here the guard is load-bearing too, and the movie is built to fall back.** Its
+AS3 carries an *online save* server over AMFPHP
+(`lbgserver.com/amfphp/amfphp-2.2/Amfphp/`) behind a domain whitelist, plus the
+CPMStar ad spots (`server.cpmstar.com/adviewas3.swf`), the Kongregate API
+(`kongregate.com/flash/API_AS3_Local.swf`), ArmorGames (`agi.armorgames.com`),
+Newgrounds, flashpenguin.com, hackedarcadegames and a wall of sponsor links. All
+of it lives inside the SWF, so there is nothing to delete in a script file; the
+`fetch` guard refuses it. On a local boot the two that are reached are the ad
+spot and the AMFPHP endpoint, and the on-host whitelist check makes the movie log
+"Domain not whitelisted for online saves" and use its local SharedObject instead —
+the path this page wants. Boot is **0 off-machine requests, 0 exceptions**, and the
+only non-loopback traffic is those two refusals.
+
+**The movie, and what the sixth conversion kept.** It came the same way the rest
+of the family did — a GitHub copy (`Magixxz/embeds`, pinned to commit
+`a9ae99ac`), pulled local and verified twice: byte length against the source tree
+and the git blob hash against the tree's own blob sha (17,467,694 bytes,
+`5f3b9fbf…`). It is the same vendored Ruffle release, with `installSharedObjects`
+before it and `js/sync.js` gone. Its save is a *profile* — the method names say so
+(`loadProfileFromSharedObject`, `saveProfileToSharedObject`, `eraseSharedObject`,
+"Could not load any profile from local SharedObject, trying to load backup") — and
+the slot name is `LTF3`, read off its constant pool. Its movie is 720×540 (4:3);
+the wrapper it replaces carried the shared template's 5.5/3 box, which stretched
+the picture, so the page uses the movie's own ratio like its sibling.
 
 ---
 
