@@ -1,14 +1,10 @@
 <!DOCTYPE html>
-
-<!-- Pluto Game 9/11/2026 -->
-
 <html lang="en">
 <head>
-<script src="../../js/sync.js"></script>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>really cool flash game</title>
+  <title>Learn to Fly 2</title>
   <style>
     html, body {
       margin: 0;
@@ -18,15 +14,23 @@
       height: 100%;
       width: 100%;
     }
-
     #flash-container {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: black;
+      overflow: hidden;
     }
-
+    .black-box {
+      position: fixed;
+      background: black;
+      z-index: 10;
+    }
+    #box-top    { top: 0;    left: 0;  width: 100%; height: 0; }
+    #box-bottom { bottom: 0; left: 0;  width: 100%; height: 0; }
+    #box-left   { top: 0;    left: 0;  width: 0;    height: 100%; }
+    #box-right  { top: 0;    right: 0; width: 0;    height: 100%; }
     ruffle-player {
       width: 100%;
       height: 100%;
@@ -34,14 +38,101 @@
       display: block;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
-  
+
+  <!-- The save. Ruffle keeps every Flash save - a SharedObject - in localStorage:
+       its wasm carries a `ruffle_web::storage::LocalStorageBackend` and reaches
+       the browser through `window.localStorage`. Swapping the area before Ruffle
+       initialises is therefore the whole conversion, the same shape as any other
+       Web Storage engine (STORAGE.md section 11, and section 14 for this one).
+
+       This movie's storage is named in its own constant pool: the names
+       `mainprofile`, `SharedObject`, `getLocal`, `data` and `flush` sit together,
+       so it is SharedObject.getLocal("mainprofile"). Its fields are spelled out
+       right above that - saveState0/2/3, currentDataState, GAME_ID, GAME_MODE,
+       save_date, old_dis/alt/dur/spe/des, player_cash/length/height/fuel and
+       upg_sleigh/glider/boost/payload, each with a `test_` twin, plus
+       obstacle_health_left, obstacleDestroyedCount, classicModeGoalBool and
+       challengeBool. Ruffle names the slot after the movie's own URL,
+       "<host>/games/learn-to-fly-2/learn-to-fly-2.swf/mainprofile", so naming the
+       movie narrows that to "learn-to-fly-2.swf/mainprofile".
+
+       This has to come before `ruffle.min.js`, because the player reads a movie's
+       save as it loads it. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'learn-to-fly-2' });
+    var storage = PluStore.installSharedObjects('learn-to-fly-2.swf');
+    if (!storage) {
+      console.error('Learn to Fly 2: window.localStorage could not be swapped - ' +
+        'the save would go to the browser store instead of the document');
+    }
+
+    /* Nothing on this page may leave the machine, and this movie reaches out in
+       more than one place. Its constant pool carries an arcadeprehacks.com
+       save-transfer file it loads and a timeout waiting for it, a GamesChart
+       client (gameschart.com/flash_client/getBrain.php), the CPMStar ad spot
+       (server.cpmstar.com/adviewas2.swf), Kongregate and FlashGameLicense and
+       Newgrounds host names, a kongnet.net ad delivery pair, and the MochiAds
+       bootstrap (mochibot.com). Every one of them lives inside the SWF, so there
+       is nothing to delete in a script file. The page refuses them in a
+       `window.fetch` guard: same origin, `data:` and `blob:` pass, anything else
+       is rejected with a warning, once per URL. Ruffle fetches through
+       `window.fetch` and never through XMLHttpRequest, so that one call is the
+       whole surface. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
+
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        if (refused.indexOf(url) < 0) {
+          refused.push(url);
+          console.warn('Learn to Fly 2: refused a request outside this folder: ' + url);
+        }
+        return Promise.reject(new TypeError('Learn to Fly 2: only this folder is reachable (' + url + ')'));
+      };
+    })();
+  </script>
+
+  <!-- Ruffle, vendored from the release this page already pinned
+       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
+       beside it) with the core glue and the wasm it fetches from this folder at
+       run time. The published page took ruffle.min.js from jsDelivr and carried
+       the save off through js/sync.js; neither is here any more.
+
+       Both core pairs are kept, and both are needed: ruffle.min.js probes
+       WebAssembly.validate() for SIMD and four other extensions and loads
+       core.ruffle.ae105... + f7f28e....wasm when all five are present, falling
+       back to core.ruffle.9085... + 4d8824....wasm otherwise ("falling back to
+       the vanilla WebAssembly module"). A browser without SIMD is 13 MB of unused
+       files; a browser without the pair it needs has no player at all. -->
+  <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>
   <div id="flash-container"></div>
-
+  <div class="black-box" id="box-top"></div>
+  <div class="black-box" id="box-bottom"></div>
+  <div class="black-box" id="box-left"></div>
+  <div class="black-box" id="box-right"></div>
   <script>
-    const container = document.getElementById("flash-container");
+    const container = document.getElementById('flash-container');
+    const boxTop = document.getElementById('box-top');
+    const boxBottom = document.getElementById('box-bottom');
+    const boxLeft = document.getElementById('box-left');
+    const boxRight = document.getElementById('box-right');
 
     function resizeGame() {
       const windowWidth = window.innerWidth;
@@ -58,22 +149,33 @@
 
       container.style.width = `${width}px`;
       container.style.height = `${height}px`;
+
+      const topMargin = (windowHeight - height) / 2;
+      const leftMargin = (windowWidth - width) / 2;
+
+      boxTop.style.height = `${topMargin}px`;
+      boxBottom.style.height = `${topMargin}px`;
+      boxLeft.style.width = `${leftMargin}px`;
+      boxRight.style.width = `${leftMargin}px`;
     }
 
-    window.addEventListener("resize", resizeGame);
-    window.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener('resize', resizeGame);
+    window.addEventListener('DOMContentLoaded', () => {
       resizeGame();
-
       const ruffle = window.RufflePlayer?.newest() || window.RufflePlayer?.createPlayer();
       if (ruffle && container) {
         const player = ruffle.createPlayer();
-        player.style.width = "100%";
-        player.style.height = "100%";
-        player.style.background = "black";
+        player.style.width = '100%';
+        player.style.height = '100%';
+        player.style.background = 'black';
         container.appendChild(player);
-        player.load("https://cdn.jsdelivr.net/gh/bubbls/UGS-file-encryption@2ac4fd0d582862a91904e93acb916c53b8df1653/Learn%20to%20Fly%202%20(cracked).swf");
+        /* The published page fetched the movie from jsDelivr with a URL-escaped
+           file name. The copy beside this page is the same bytes, verified
+           against the source's own git blob hash, and the URL is absolute so
+           Ruffle has a base to resolve anything the movie asks for by name. */
+        player.load(new URL('learn-to-fly-2.swf', location.href).href);
       } else {
-        container.textContent = "Ruffle failed to load."; 
+        container.textContent = 'Ruffle failed to load.';
       }
     });
   </script>

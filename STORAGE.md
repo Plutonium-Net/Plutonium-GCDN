@@ -133,7 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
-| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/) and [section 14](#14-flash-ruffle) |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — nineteen games are on PluStore
-   so far, and 14 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — twenty games are on PluStore
+   so far, and 13 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -2201,13 +2201,18 @@ stripped prefix.
 
 ## 14. Flash (Ruffle)
 
-`games/duck-life/` and `games/duck-life-2/` are Flash builds — one `.swf` each,
-played by Ruffle, a WASM Flash player. Nothing inside a movie is patched — this
-is the shortest conversion in the document — but two things about Ruffle are not
-obvious: the key its saves are named by, and the fact that its save is already
-`localStorage`. The second game is written up alongside the first because it
-taught one thing the first could not ([section 14.9](#149-what-the-second-conversion-added)):
-a movie may not open its save at all until the player starts the game.
+`games/duck-life/`, `games/duck-life-2/` and `games/learn-to-fly/` are Flash
+builds — one `.swf` each, played by Ruffle, a WASM Flash player. Nothing inside a
+movie is patched — this is the shortest conversion in the document — but two
+things about Ruffle are not obvious: the key its saves are named by, and the fact
+that its save is already `localStorage`. Each later game is written up alongside
+the first because it taught something the earlier one could not:
+[section 14.9](#149-what-the-second-conversion-added) (a movie may not open its
+save at all until the player starts the game),
+[section 14.10](#1410-what-the-third-conversion-added) (a build can gate its own
+start behind a dead ad network and still start), and
+[section 14.11](#1411-what-the-fourth-conversion-added) (the exact byte layout of
+a save, and why a Flash round trip proves equivalence rather than survival).
 
 ### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
 
@@ -2351,23 +2356,32 @@ A SharedObject's bytes are base64'd into an `@file` block, and they are readable
 by hand. Decoding both converted saves gives the same shape:
 
     offset  bytes
-    0       `00 bf`
-    2       a uint32, big-endian: how many bytes follow the six-byte header
-    6       `TCSO`
-    10      `00 04 00 00 00 00`
-    16      the slot name: a uint16 length, then UTF-8 (`00 06` `mydata`)
-    24      four bytes, then the properties
-            each = a uint16 name length, the name, then the value:
-              number  `00`, eight big-endian bytes (a double), then `00`
-              string  `06`, a u29 length, then the UTF-8 bytes
+    0       `00 bf`                         HEADER_VERSION
+    2       a uint32, big-endian: the file's total length
+    6       `TCSO` `00 04 00 00 00 00`      HEADER_SIGNATURE (10 bytes)
+    16      the slot name: a uint16 length, then UTF-8 (`00 0a` `learntofly`)
+    28      three `00` PADDING bytes, then the AMF version (`00` for AMF0)
+    32      the elements, to the end of the file — there is no terminator
+            each = a uint16 name length, the name, an AMF0 value, then `00`
+              number     `00`, eight big-endian bytes (a double)
+              boolean    `01`, one byte
+              string     `02`, a uint16 length, then the UTF-8 bytes
+              undefined  `06`, nothing
 
-Fitted against both movies, that reads every field and lands exactly on the last
-byte; the numbers come back as the values they should be (`maxi` 20, `maxmaxi`
-30, `seed` 5) and the names as the strings the constant pool lists. The string
-form is the least exercised part of it — both saves hold only empty ones, because
-neither duck was ever named — so treat `06` as measured and other variants as
-unverified. What matters for hand inspection is that the names are legible, so a
-`@file` block can be read with no tooling at all:
+The trailing `00` after each element is the one the first reader missed. It is
+`flash-lso`'s `PADDING` constant (`write_element_and_padding`, in
+ruffle-rs/rust-flash-lso), the crate Ruffle writes its SharedObjects through, and
+leaving it out is not a near miss: it puts every field after the first one byte
+to the left, so the next reader takes the padding for a name's high byte and stops
+at the first byte it cannot read as a marker. Fitted against that same writer, the
+layout above parses Learn to Fly's 698-byte save to exactly its last byte — 34
+fields, names and numbers both — and Duck Life's the same way. The numbers come
+back as the values they should be (`maxi` 20, `maxmaxi` 30, `seed` 5) and the
+names as the strings the constant pool lists. `06` is Undefined with nothing
+after it, not a string ([section 14.11](#1411-what-the-fourth-conversion-added));
+a string is `02`, a uint16 length and the bytes. What matters for hand inspection
+is that the names are legible, so a `@file` block can be read with no tooling at
+all:
 
     @file duck-life.swf/mydata
     AL8AAACxVENTTwAEAAAAAAAGbXlkYXRh…
@@ -2398,8 +2412,8 @@ next boot and survived there.
   confirm both that Ruffle is handed exactly those bytes and that the game's own
   variables keep them.
 
-Six further Ruffle wrappers are in this repo still on the old bridge
-(`learn-to-fly`, `learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
+Five further Ruffle wrappers are in this repo still on the old bridge
+(`learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
 `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the same three
 things: the player vendored, `installSharedObjects('<movie>.swf')` before it, and
 the movie named correctly.
@@ -2539,6 +2553,66 @@ Object.defineProperty(window, 'PluStore', {
 
 as `plustore.js` publishes with `global.PluStore = PluStore`, that assignment goes
 through the setter, and the wrapper sees every read and write the movie makes.
+
+### 14.11 What the fourth conversion added
+
+Learn to Fly is the fourth Ruffle conversion, and the first whose save is dense
+enough to read the container apart from the message. Two things it added.
+
+**The exact shape of a save, and the byte the earlier reader dropped.** The
+container is Adobe's Local Shared Object as serialized by `flash-lso`
+(ruffle-rs/rust-flash-lso), which is what makes
+[section 14.7](#147-reading-the-save-and-applying-one-from-outside) checkable
+rather than inferred: a `HEADER_VERSION`, a length, a ten-byte signature, the slot
+name, three `PADDING` bytes and the AMF version, then a flat list of
+`u16 name, AMF0 value, 0x00` elements with no terminator. Leaving the per-element
+`0x00` out is not a near miss — it shifts every following field one byte left, so
+the first reader took the padding for a name length and stopped at byte 321 of a
+698-byte save with only 15 of its 34 fields parsed. Read correctly, the same bytes
+reach the last byte exactly and `cash`, `lvlramp` and the `stage*` numbers come
+back as the numbers the movie's own constant pool names.
+
+**The round trip has two traps, and only one of them is the conversion's.** The
+first is [section 14.7](#147-reading-the-save-and-applying-one-from-outside)'s
+rule with a way to satisfy it: a *live* movie re-flushes its SharedObject out of
+its in-memory data, so a document edited while the game's page is up is overwritten
+within a second or two. Measured here: the edit read back correctly, then the next
+boot found `cash=0` again with `PluStore.stats().fileWrites` at `0` — the write
+came from the page just left, not from the new one. The fix is to edit from a page
+on the same origin that is *not* playing the movie (a blank page in the served
+root), which keeps the edit out of reach of any player.
+
+The second trap is that the movie overwrites the fields you seed. Learn to Fly
+resets `cash`, `cday`, `lvlramp` and every `stage*` number on the screen it saves
+from, so seeding them survives only as far as the storage boundary and says nothing
+about the movie. The control that separates the two is the *same movie on the
+browser's real `localStorage`*, with no PluStore in the path: it overwrites the
+identical seed the identical way, which is what makes the reset the movie's
+behaviour rather than the conversion's. What a Flash conversion can therefore claim
+is equivalence — Ruffle is handed exactly the bytes the browser's own store would
+have handed it, and the movie then does with them whatever it always did — not that
+the game kept a value you typed in.
+
+Measured for Learn to Fly:
+
+- boot: 0 off-machine requests and 0 exceptions; the only requests are the page,
+  `plustore.js`, `ruffle.min.js`, the SIMD core/wasm pair and the movie, all
+  loopback;
+- the movie's save lands in the document as one block,
+  `@file learn-to-fly.swf/learntofly`, a 932-char base64 body that decodes to the
+  698-byte object holding all 34 fields;
+- on reload the movie's own `localStorage["learn-to-fly.swf/learntofly"]` returns
+  the seeded body — a read through the same area Ruffle uses, so the document is
+  what the player is handed;
+- the control under the real store produces identical post-play state (`cash=0`,
+  `lvlramp=1`), so the conversion preserves the movie's storage behaviour exactly.
+
+Two smaller notes. The movie is AS2 and its save is one object,
+`SharedObject.getLocal("learntofly")`, so it lands under `learn-to-fly.swf/learntofly`
+with no sibling blocks — Duck Life's shape with a movie-specific slot name rather
+than the shared `mydata`. And the wrapper's box is `5.5 / 3`, which is the original
+page's own aspect ratio and is kept as it was rather than corrected to the movie's
+4:3.
 
 ---
 
@@ -3174,6 +3248,12 @@ is what makes a re-encode safe to hand back.
   `fileWrites` counts a boot rather than a save, and a hand edit made while the
   game is running can be overwritten by that dying flush before anything reads
   it.
+- **A movie can overwrite the field you seed, under any storage.** Learn to Fly
+  resets `cash`, `cday` and every `stage*` number on the screen it saves from, and
+  does so identically with the browser's own `localStorage` — so seeding a field
+  proves the storage boundary, not the game, and equivalence between the converted
+  page and the original is the claim a Flash round trip can support
+  ([section 14.11](#1411-what-the-fourth-conversion-added)).
 - **A Flash conversion needs both Ruffle core pairs, and a movie that is named.**
   The player picks its wasm by probing for WebAssembly extensions, so the pair a
   current browser does not use still has to ship, and `player.load()` has to be
