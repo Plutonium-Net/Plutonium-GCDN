@@ -130,7 +130,7 @@ exists today:
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
-| Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
+| Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use — see the five Phaser `phaser-super-storage` builds [`games/motox3m/`](games/motox3m/), [`games/motox3m-2/`](games/motox3m-2/), [`games/motox3m-3/`](games/motox3m-3/), [`games/motox3m-spookyland/`](games/motox3m-spookyland/), [`games/motox3m-winter/`](games/motox3m-winter/) and [section 11](#11-web-storage-localstorage) |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
 | Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" (or, when the movie names no movie in the key, the host dropped so the rest is fixed text) | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/), [`games/learn-to-fly-3/`](games/learn-to-fly-3/) and [section 14](#14-flash-ruffle) |
@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — twenty-two games are on PluStore
-   so far, and 11 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — twenty-seven games are on PluStore
+   so far, and 6 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -1735,6 +1735,204 @@ an area that raised where the game used to work would take the page down with it
 Both surfaces are views of the same `@file` blocks, so they cannot drift — a key
 written through one is readable through the other, in the same tick and in the
 document.
+
+### 11.7 What the Moto X3M conversion added
+
+Moto X3M is a Phaser 2 game (Phaser + nape + EaselJS + Bluebird + DragonBones)
+whose storage is **`phaser-super-storage`**, a Phaser plugin that picks its
+adapter once, at boot:
+
+```js
+isLocalStorageSupport() ? new LocalStorage() : new CookieStorage()
+```
+
+`isLocalStorageSupport()` only probes `typeof localStorage` and then does a
+`setItem`/`removeItem` of a throwaway key — all of which the installed area
+answers — so a page that swaps the area *before the game boots* gets the
+`localStorage` adapter, and that is the whole conversion. The ordering matters for
+a second, subtler reason than usual: the plugin chooses its adapter when it is
+created, and a cookie adapter cannot be un-chosen on the first save.
+
+**The keys.** The build's `Constants.STORAGE_KEY` is `mx3msf2_gm`, so the game's
+keys reach the document as `@file` blocks under their own names — no namespace, no
+host, nothing to map:
+
+| Key | What it holds |
+|---|---|
+| `mx3msf2_gm` | the settings/progress object: `{"m":…,"sf":…,"invsav":{…}}` — music, sound effects, and the per-bike save |
+| `mx3msf2_gmh` | a single number the game writes beside it (a saved-progress value) |
+
+**The published page was a cloak, and the game was two hosts away.** The original
+`games/motox3m/index.html` was not a game at all: it framed a Google Apps Script
+and, behind a button, fetched an `m3m.xml` from an editmysite preview host whose
+`<Content>` held the real page — which in turn loaded every script and asset from
+that host by absolute URL, under a "classroom.google.com" title. The local page is
+built from that `<Content>`: the same seven libraries and the same `min.js`,
+pulled into `assets/lib/` and the game folder, with the GameMonetize ad SDK and the
+Google IMA SDK dropped (the game only listens for the SDK's
+`SDK_GAME_START`/`SDK_GAME_PAUSE` events, so with no SDK nothing fires and nothing
+is missed), and the `fetch` **and** `XMLHttpRequest` guard other conversions carry,
+because Phaser loads assets through both.
+
+**The base URL was baked into the game.** `min.js` carried seventeen absolute URLs
+to the GameMonetize host, one per asset family — `…/files/assets/levels/`,
+`…/files/assets/images/`, `…/files/assets/atlases/`, the two sound folders and the
+three font CSS files — so a local page with local files still asked the internet
+for every level and sprite. Rewriting that one prefix to a relative `assets/` is
+what makes the folder self-contained. The full asset list then names itself: the
+loader builds its paths, so the missing files appear as the page's own 404s and can
+be pulled one page-load at a time (74 files here — 25 level JSONs, five atlases and
+their images, ~40 sounds, three font families).
+
+**Both paths are proven at the game level, not just at the boundary.** A same-origin
+blank page seeded the document under the game's own two keys, and the page's
+installed area was instrumented so the game's own calls are visible. Booting the
+game produced, in order: the plugin's `setItem testingLocalStorage` probe, a
+`getItem('mx3msf2_gm')` that returned the **seeded** object (including a marker key
+the seed carried), a `getItem('mx3msf2_gmh')` that returned the seeded number, and
+then the game's `setItem`s of its own updated versions. The read is a value the game
+could only have got from the document; the write is the game landing back in it.
+The seeded marker was dropped and the game's `l_e` timestamp advanced, i.e. the game
+parsed our save and wrote its own — the whole round trip, both directions. Boot is
+**0 off-machine requests, 0 exceptions**, the canvas renders at 720×480, and the
+only 404 is `favicon.ico`.
+
+### 11.8 What the Moto X3M 2 conversion added
+
+Moto X3M 2 is the same engine as Moto X3M — Phaser, nape, EaselJS, Bluebird,
+DragonBones, and the same `phaser-super-storage` plugin — but it was **already a
+real folder**, not a cloak, so its conversion is much smaller.
+
+**The source was pinned, and the whole folder verified by hash.** The wrapper page
+loaded the game through a `<base href>` pointing at
+`cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/moto2/` — a moving `@main` ref. Pinning
+it to the commit `main` resolved to (`9cf4332`) and pulling all 137 blobs gave a
+complete, self-contained game, each file checked against the tree's own git blob
+sha before it was kept: 134 files, 14.0 MB. Nothing had to be discovered by running
+the game, because the source folder is the whole thing — `min.js` already used
+relative `./assets/…` paths, so **no base URL was baked in** and none had to be
+rewritten (the difference from its sibling, [section 11.7](#117-what-the-moto-x3m-conversion-added)).
+
+**The page.** The `<base href>`, the old `js/sync.js` and the source's UBGS
+analytics/client scripts are gone; the libraries load from `assets/box2dweb/` and
+the game's own `jsdelivr/` subfolder (where it puts `phaser-cachebuster` and
+`phaser-super-storage`), and `installWebStorage()` runs before the game boots for
+the same reason it does for its sibling. The `fetch`/`XMLHttpRequest` guard is
+there too.
+
+**The keys.** This build's are `mx3m2sf2_vseigru` (the progress/settings object)
+and `mx3m2sf2_vseigruh` (the number beside it), plus the sound settings
+`mx3m2sf2sfx` (`{"m":…,"sf":…}`) and its own `mx3m2sf2sfxh` — four keys, all in
+the document under their own names. (`Constants.STORAGE_KEY` is
+`mx3m2sf2_vseigru` and `STORAGE_KEY_SFX` is `mx3m2sf2sfx`; the `h` keys are the
+companions the game writes beside each.)
+
+**Both paths proven the same way.** A blank page seeded the three keys and the
+installed area was instrumented. Booting the game produced the plugin's
+`setItem testingLocalStorage` probe, a `getItem('mx3m2sf2sfx')` that returned the
+**seeded** `9` (twice), a `getItem('mx3m2sf2sfxh')` that correctly returned `null`
+for a key we had not seeded, and then the game's own `setItem`s of
+`{"m":true,"sf":true}` and a fresh hash. The read is a value only the document
+had; the write landed back in it. Boot is **0 off-machine requests, 0 exceptions**,
+canvas 720×480, only `favicon.ico` 404.
+
+### 11.9 What the Moto X3M 3 conversion added
+
+Moto X3M 3 is the same engine again — Phaser, nape, EaselJS, Bluebird,
+DragonBones, `phaser-super-storage` — and its page loaded all six libraries *and*
+the game from `cdn.jsdelivr.net/gh/bubbls/ruffle` by absolute URL, with no folder
+of its own.
+
+**The libraries came from a shared repository, and the game carried its own base
+too.** The `bubbls/ruffle` repo is a grab-bag of many games' files at its root, so
+the seven files this page needs were picked out by name from the tree at the pinned
+commit (`58d9d253`) and each verified against its git blob sha. The page's two
+OrangeGames plugins are loaded by the *game* at run time, from npm URLs, so they
+were vendored too. And `moto3.js` — the game — carried the same baked-in asset base
+as its first sibling, again under a GameMonetize host but a different one:
+**twenty** absolute URLs (`assets/levels/`, `assets/images/`, `assets/atlases/`,
+the two sound folders, the three font CSS files and the DragonBones script).
+Rewriting that one prefix to relative, and the two npm URLs to local files, is what
+makes the folder self-contained; the remaining ~80 assets then named themselves
+from the page's own 404s.
+
+**The keys.** This build's are `mx3m3sf2_vseigru` and `mx3m3sf2sfx` with their `h`
+companions — the same shape as Moto X3M 2, different prefix.
+
+**Both paths proven the same way.** Seeding the document from a blank page and
+instrumenting the installed area showed the game's own `getItem('mx3m3sf2sfx')`
+returning the seeded `7` (twice) and `getItem('mx3m3sf2sfxh')` returning the seeded
+`314159`, then its `setItem`s of `{"m":true,"sf":true}` and a fresh hash — the read
+is a value only the document had, the write landed back in it. Boot is **0
+off-machine requests, 0 exceptions**, only `favicon.ico` 404 — and the page's own
+Google Analytics tag and empty trailing `<script>` are gone with the rest.
+
+### 11.10 What the MotoX3M Spooky Land conversion added
+
+MotoX3M 6 Spooky Land (the folder is `motox3m-spookyland`) is the same engine once
+more — Phaser, nape, EaselJS, Bluebird, DragonBones, `phaser-super-storage` — and
+the fourth of the family done.
+
+**Everything came from one GameMonetize host, and the game carried its base.** The
+page loaded and `motox3m6.min.js` carried **19** absolute URLs (its own host string
+again) for every level, sprite, atlas, sound and the three font CSS files. All were
+rewritten to relative, the eight libraries and the game pulled local, and the
+remaining ~80 assets named themselves from the page's own 404s. This build has only
+`theme0` — its atlas `theme1`/`theme2` 404 on the source host too, so they are not
+in the folder and the game never asks for them.
+
+**The page.** The Google IMA ad SDK, the GameMonetize SDK, the wrapper's `js/sync.js`
+and its Google Analytics tag are all gone; the libraries load from `assets/lib/` and
+`installWebStorage()` runs before the game boots, as for its siblings.
+
+**The keys.** This build's `STORAGE_KEY` is `mx3m_6_gm`, so its keys are
+`mx3m_6_gm` and `mx3m_6_gmh`.
+
+**Both paths proven the same way.** A blank page seeded the document and the
+installed area was instrumented: the game's own `getItem('mx3m_6_gm')` returned the
+**seeded** object (marker key and all) twice, `getItem('mx3m_6_gmh')` returned the
+seeded `271828`, and then its `setItem`s wrote the game's own updated object and
+hash. Read and write both proven at the game level. Boot is **0 off-machine
+requests, 0 exceptions**, canvas 720×480, only `favicon.ico` 404.
+
+### 11.11 What the Moto X3M Winter conversion added
+
+Moto X3M Winter is the fifth and last of the family — Phaser, nape, EaselJS,
+Bluebird, DragonBones, `phaser-super-storage`, same as the rest.
+
+**A complete folder in the shared repo, and a base pointing elsewhere.** Like Moto
+X3M 2, the source is a real folder rather than a cloak, so the `moto winter/`
+subfolder of `bubbls/UGS-Assets` (pinned to commit `9cf4332`) was pulled whole and
+every one of its 92 blobs verified against the tree's git blob sha before it was
+kept — 9.4 MB, complete, nothing to discover by running. But the game file was not
+self-contained: `motox3m4.min.js` carried **20** absolute URLs to a *different*
+jsDelivr repo (`bodrumkat/hardes1@main/`) for every level, sprite, atlas, sound and
+font CSS, plus the two npm plugin URLs. Rewriting those to relative and vendoring
+the plugins is what makes the folder self-contained.
+
+**The page.** The `<base href>` pointing at jsDelivr and the old `js/sync.js` are
+gone; the libraries load from `assets/box2dweb/` and `installWebStorage()` runs
+before boot, as for every sibling.
+
+**The keys.** This build's `STORAGE_KEY` is `mx3m_4_gd`, so its keys are
+`mx3m_4_gd` and `mx3m_4_gdh`.
+
+**Both paths proven the same way.** Seeding the document from a blank page and
+instrumenting the installed area showed the game's own `getItem('mx3m_4_gd')`
+returning the **seeded** object (marker key and all, twice), `getItem('mx3m_4_gdh')`
+returning the seeded `161803`, then its `setItem`s writing the game's own updated
+object and hash. Boot is **0 off-machine requests, 0 exceptions**, canvas 720×480,
+only `favicon.ico` 404.
+
+**The family is done.** All five Moto X3M variants are on PluStore — this one,
+[section 11.7](#117-what-the-moto-x3m-conversion-added),
+[section 11.8](#118-what-the-moto-x3m-2-conversion-added),
+[section 11.9](#119-what-the-moto-x3m-3-conversion-added) and
+[section 11.10](#1110-what-the-motox3m-spooky-land-conversion-added). Four of the
+five needed a baked-in asset base rewritten; the difference between them is only
+which host it pointed at (a GameMonetize preview host three times, a jsDelivr repo
+the fourth) and whether the folder had to be assembled by running the game or came
+whole.
 
 ## 12. YouTube Playables (`ytgame`)
 

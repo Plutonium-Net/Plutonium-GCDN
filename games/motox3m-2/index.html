@@ -1,31 +1,99 @@
-
-<!-- Pluto Game 9/11/2026 -->
-
-
-
-<base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/moto2/">
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="../../js/sync.js"></script>
-<meta charset="utf-8" />
-<meta http-equiv="x-ua-compatible" content="ie=edge">
-<meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
-<link rel="stylesheet" href="./assets/css/app.css" type="text/css" />
-<title>Moto X3M 2 Unblocked</title>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  
+  <meta charset="utf-8" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
+  <link rel="stylesheet" href="assets/css/app.css" type="text/css" />
+  <title>Moto X3M 2 Unblocked</title>
+
+  <!-- The save. Same engine and the same plugin as Moto X3M - Phaser with
+       `phaser-super-storage` (loaded at run time from this folder's `jsdelivr/`),
+       whose adapter is chosen once at boot: `isLocalStorageSupport() ?
+       LocalStorage : CookieStorage`. The probe passes against the installed area,
+       so this is a Web Storage game and the area swap of STORAGE.md section 11 is
+       the whole conversion. The build's keys are `mx3m2sf2_vseigru`,
+       `mx3m2sf2_vseigruh` and `mx3m2sf2sfx`.
+
+       This has to load before the game boots, because the plugin picks its
+       adapter once. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'motox3m-2' });
+    var storage = PluStore.installWebStorage();
+    if (!storage) {
+      console.error('Moto X3M 2: window.localStorage could not be swapped - the ' +
+        'save would go to the browser store instead of the document');
+    }
+
+    /* Nothing on this page may leave the machine. The published page reached the
+       game through a `<base href>` pointing at jsDelivr and carried the old
+       js/sync.js; the game itself names a handful of portal hosts (y8.com,
+       coolmathgames.com, kizi.com, yep10.com) and three webfont services. All of
+       that is gone from the page, but the game's own loader can still be handed an
+       absolute URL, and Phaser loads through both `XMLHttpRequest` and `fetch`, so
+       both are refused. Same origin, `data:` and `blob:` pass; anything else is
+       rejected once per URL with a warning. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
+
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
+        }
+      }
+      function note(url) {
+        if (refused.indexOf(url) < 0) {
+          refused.push(url);
+          console.warn('Moto X3M 2: refused a request outside this folder: ' + url);
+        }
+      }
+
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        note(url);
+        return Promise.reject(new TypeError('Moto X3M 2: only this folder is reachable (' + url + ')'));
+      };
+
+      var open = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        if (!local(url)) {
+          note(url);
+          throw new TypeError('Moto X3M 2: only this folder is reachable (' + url + ')');
+        }
+        return open.apply(this, arguments);
+      };
+    })();
+  </script>
 </head>
 <body>
-<div id="content"></div>
-<div id="orientation"></div>
-<div id="loader">Loading ...</div>
-<script type="text/javascript" src="./assets/box2dweb/nape.min.js">
-        var nape ="./assets/box2dweb/nape.min.js";
-    </script>
-<script type="text/javascript" src="./assets/box2dweb/nape-debug-draw.min.js"></script>
-<script type="text/javascript" src="./assets/box2dweb/jquery-3.1.1.min.js"></script>
-<script type="text/javascript" src="./assets/box2dweb/easeljs-0.8.2.combined.js"></script>
-<script type="text/javascript" src="./assets/box2dweb/bluebird.min.js"></script>
-<script type="text/javascript" src="./motox3m2.min.js?1489d20b164b3a2d04c4"></script>
+  <div id="content"></div>
+  <div id="orientation"></div>
+  <div id="loader">Loading ...</div>
+
+  <!-- Every file below is the pinned jsDelivr copy (bubbls/UGS-Assets commit
+       9cf4332, the `moto2/` folder), pulled local and verified by git blob hash.
+       The `<base href>` that pointed at the CDN is gone, so these relative paths
+       resolve inside this folder. `motox3m2.min.js` bundles Phaser and loads its
+       remaining libraries (phaser-cachebuster, phaser-super-storage, dragonBones)
+       from `jsdelivr/` and `assets/box2dweb/` at run time. The source page's UBGS
+       analytics/client scripts (`../js/analytics_ubg_v1_4.js`) and `js/sync.js`
+       are gone. -->
+  <script type="text/javascript" src="assets/box2dweb/nape.min.js">
+    var nape = "assets/box2dweb/nape.min.js";
+  </script>
+  <script type="text/javascript" src="assets/box2dweb/nape-debug-draw.min.js"></script>
+  <script type="text/javascript" src="assets/box2dweb/jquery-3.1.1.min.js"></script>
+  <script type="text/javascript" src="assets/box2dweb/easeljs-0.8.2.combined.js"></script>
+  <script type="text/javascript" src="assets/box2dweb/bluebird.min.js"></script>
+  <script type="text/javascript" src="motox3m2.min.js"></script>
 </body>
 </html>

@@ -1,9 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
+  <link rel="stylesheet" href="apap.css" type="text/css" />
+  <title>Moto X3M 3</title>
 
+  <!-- The save. Same engine and the same plugin as the other two Moto X3M
+       conversions - Phaser with `phaser-super-storage` - whose adapter is chosen
+       once at boot: `isLocalStorageSupport() ? LocalStorage : CookieStorage`. The
+       probe passes against the installed area, so this is a Web Storage game and
+       the area swap of STORAGE.md section 11 is the whole conversion. This build's
+       keys are `mx3m3sf2_vseigru` and `mx3m3sf2sfx` (plus the `h` companions).
 
-<!-- Pluto Game 9/11/2026 -->
+       This has to load before the game boots, because the plugin picks its adapter
+       once - and here the plugin is loaded by the game itself, from a local script
+       the page does not name. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'motox3m-3' });
+    var storage = PluStore.installWebStorage();
+    if (!storage) {
+      console.error('Moto X3M 3: window.localStorage could not be swapped - the ' +
+        'save would go to the browser store instead of the document');
+    }
 
+    /* Nothing on this page may leave the machine. The published page loaded all
+       six libraries and the game itself from `cdn.jsdelivr.net/gh/bubbls/ruffle`
+       by absolute URL, and the game's own file carried twenty absolute URLs to an
+       editmysite host (every level, sprite, atlas, sound and the DragonBones
+       script) plus two npm URLs for its plugins. All of those are rewritten to
+       this folder, but Phaser loads through both `XMLHttpRequest` and `fetch`, so
+       both are refused here too. Same origin, `data:` and `blob:` pass; anything
+       else is rejected once per URL with a warning. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
 
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
+        }
+      }
+      function note(url) {
+        if (refused.indexOf(url) < 0) {
+          refused.push(url);
+          console.warn('Moto X3M 3: refused a request outside this folder: ' + url);
+        }
+      }
 
-<!DOCTYPE html> <html lang="en"> <head>
-<script src="../../js/sync.js"></script> <meta charset="utf-8" /> <meta http-equiv="x-ua-compatible" content="ie=edge"> <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" /> <title>Moto X3M 3</title> <script async src="https://www.googletagmanager.com/gtag/js?id=G-MENBM6GSNY"></script><script>function gtag(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],gtag("js",new Date),gtag("config","G-MENBM6GSNY")</script> <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/apap.css" type="text/css" /> <meta http-equiv="Content-Type" content="text/html; charset=utf-8">   
-</head> <body> <div id="content"></div> <div id="orientation"></div> <div id="loader">Loading ...</div> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/napem.js"> var nape ="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/napem.js"; </script> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/draw.js"></script> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/jq.js"></script> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/ease.js"></script> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/bluemin.js"></script> <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/bubbls/ruffle@58d9d25357dc8597da2691dc003f35c4ca25ac65/moto3.js"></script> <script src=""></script> </body> </html>
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        note(url);
+        return Promise.reject(new TypeError('Moto X3M 3: only this folder is reachable (' + url + ')'));
+      };
+
+      var open = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        if (!local(url)) {
+          note(url);
+          throw new TypeError('Moto X3M 3: only this folder is reachable (' + url + ')');
+        }
+        return open.apply(this, arguments);
+      };
+    })();
+  </script>
+</head>
+<body>
+  <div id="content"></div>
+  <div id="orientation"></div>
+  <div id="loader">Loading ...</div>
+
+  <!-- Every file below is the pinned jsDelivr copy (bubbls/ruffle commit
+       58d9d253), pulled local and verified by git blob hash, with the CDN URLs
+       replaced by relative ones. `moto3.js` is the game: it bundles Phaser and
+       loads its two plugins (`phaser-cachebuster.min.js`,
+       `phaser-super-storage.min.js`) and `assets/box2dweb/dragonBones.min.js`
+       from this folder at run time. The wrapper's `js/sync.js`, its Google
+       Analytics tag and its empty trailing `<script>` are gone. -->
+  <script type="text/javascript" src="napem.js">
+    var nape = "napem.js";
+  </script>
+  <script type="text/javascript" src="draw.js"></script>
+  <script type="text/javascript" src="jq.js"></script>
+  <script type="text/javascript" src="ease.js"></script>
+  <script type="text/javascript" src="bluemin.js"></script>
+  <script type="text/javascript" src="moto3.js"></script>
+</body>
+</html>
