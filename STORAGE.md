@@ -133,7 +133,7 @@ exists today:
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
-| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/) and [section 14](#14-flash-ruffle) |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — twenty games are on PluStore
-   so far, and 13 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — twenty-one games are on PluStore
+   so far, and 12 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -2201,18 +2201,21 @@ stripped prefix.
 
 ## 14. Flash (Ruffle)
 
-`games/duck-life/`, `games/duck-life-2/` and `games/learn-to-fly/` are Flash
-builds — one `.swf` each, played by Ruffle, a WASM Flash player. Nothing inside a
-movie is patched — this is the shortest conversion in the document — but two
-things about Ruffle are not obvious: the key its saves are named by, and the fact
-that its save is already `localStorage`. Each later game is written up alongside
-the first because it taught something the earlier one could not:
+`games/duck-life/`, `games/duck-life-2/`, `games/learn-to-fly/` and
+`games/learn-to-fly-2/` are Flash builds — one `.swf` each, played by Ruffle, a
+WASM Flash player. Nothing inside a movie is patched — this is the shortest
+conversion in the document — but two things about Ruffle are not obvious: the key
+its saves are named by, and the fact that its save is already `localStorage`. Each
+later game is written up alongside the first because it taught something the
+earlier one could not:
 [section 14.9](#149-what-the-second-conversion-added) (a movie may not open its
 save at all until the player starts the game),
 [section 14.10](#1410-what-the-third-conversion-added) (a build can gate its own
-start behind a dead ad network and still start), and
+start behind a dead ad network and still start),
 [section 14.11](#1411-what-the-fourth-conversion-added) (the exact byte layout of
-a save, and why a Flash round trip proves equivalence rather than survival).
+a save, and why a Learn-to-Fly-family round trip may prove only equivalence), and
+[section 14.12](#1412-what-the-fifth-conversion-added) (a save whose fields are
+objects rather than numbers, and a movie that hands the seeded values back).
 
 ### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
 
@@ -2412,8 +2415,8 @@ next boot and survived there.
   confirm both that Ruffle is handed exactly those bytes and that the game's own
   variables keep them.
 
-Five further Ruffle wrappers are in this repo still on the old bridge
-(`learn-to-fly-2`, `learn-to-fly-3`, `motox3m-3`,
+Four further Ruffle wrappers are in this repo still on the old bridge
+(`learn-to-fly-3`, `motox3m-3`,
 `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the same three
 things: the player vendored, `installSharedObjects('<movie>.swf')` before it, and
 the movie named correctly.
@@ -2613,6 +2616,58 @@ with no sibling blocks — Duck Life's shape with a movie-specific slot name rat
 than the shared `mydata`. And the wrapper's box is `5.5 / 3`, which is the original
 page's own aspect ratio and is kept as it was rather than corrected to the movie's
 4:3.
+
+### 14.12 What the fifth conversion added
+
+Learn to Fly 2 is the fifth Ruffle conversion and the second of the same family,
+and it is the first Flash save in this document whose fields are **objects rather
+than numbers**.
+
+**A nested save, and a hand reader that has to recurse.** The container is the
+same shape as its sibling's
+([section 14.7](#147-reading-the-save-and-applying-one-from-outside)) but 4867
+bytes instead of 698. Its seven top-level elements are `profileState`,
+`saveState0` … `saveState3`, `useHandCursor` and `tabEnabled`, and the interesting
+data is one level down: `profileState` holds the records and settings
+(`bestAltitude`, `daysTotal`, `medalBool`, the `bgm_*` track names, …) and each
+`saveState` is one save slot (`GAME_ID`, `game_mode`, `save_date`, `player_cash`,
+`upg_sleigh`, `challengeBool`, …). An AMF0 object is a marker `03` (or `08` for an
+ECMA array) followed by the same `u16 name, value` pairs and a `00 00 09` end
+marker, so the reader recurses. A seeded field is addressed by name, which means
+the name has to be unique in the file — `player_cash` lives inside all four
+`saveState`s, so a hand editor writes to whichever the reader reaches last. Read
+against `flash-lso`'s writer, the whole 4867-byte save parses to its last byte,
+exactly like the flat ones.
+
+**This movie hands the seeded values back.** Learn to Fly resets whatever you seed
+([section 14.11](#1411-what-the-fourth-conversion-added)), so a Flash round trip
+there proves only equivalence. This one does not. Seeding `bestAltitude` 123456,
+`player_cash` 98765 and `daysTotal` 4321 into the document from a page that was
+not playing the movie, then loading the game and playing until it wrote again, left
+all three intact — and the container it wrote back had grown from 4867 to 4925
+bytes, the movie filling in more of its own fields around them. A value the movie
+could only have got from the document, written back by the movie, is the slower
+proof [section 14.8](#148-verifying-a-flash-conversion) describes.
+
+**Here the guard is load-bearing.** Its sibling is self-contained, so its `fetch`
+guard should never fire. This one reaches out from inside the SWF: a Playtomic
+tracker (`<id>.api.playtomic.com/Tracker/q.aspx`, sent on load and on each screen,
+plus `gamevars/load.aspx`) and the MochiAds bootstrap (`mochibot.com/my/core.swf`).
+Both appear as refusals, and Ruffle logs the Mochi load as an error rather than a
+network request — which is the point: nothing leaves the machine, and the movie
+does not miss it, because neither host answers today anyway. Its constant pool also
+names CPMStar (`server.cpmstar.com/adviewas2.swf`), Kongregate, FlashGameLicense,
+Newgrounds, a `kongnet.net` ad pair, GamesChart and an `arcadeprehacks.com`
+save-transfer file; none of them is reached on a local boot.
+
+The movie itself came the way its sibling's did — from a jsDelivr copy of a GitHub
+repo (`bubbls/UGS-file-encryption`, pinned to a commit), pulled local and verified
+twice: byte length against the source tree and the git blob hash against the tree's
+own blob sha. It is a `CWS` (zlib-compressed) SWF, so a reader has to inflate past
+the first 8 bytes before its constant pool is legible. Ruffle is the same vendored
+release, and the slot name is `mainprofile` — read off the constant pool, where
+`mainprofile`, `SharedObject`, `getLocal`, `data` and `flush` sit together, and
+confirmed by the document's own key.
 
 ---
 
@@ -3253,7 +3308,15 @@ is what makes a re-encode safe to hand back.
   does so identically with the browser's own `localStorage` — so seeding a field
   proves the storage boundary, not the game, and equivalence between the converted
   page and the original is the claim a Flash round trip can support
-  ([section 14.11](#1411-what-the-fourth-conversion-added)).
+  ([section 14.11](#1411-what-the-fourth-conversion-added)). Its sequel does the
+  opposite — it writes the seeded values straight back — which is why a Flash round
+  trip has to be judged per movie rather than per engine
+  ([section 14.12](#1412-what-the-fifth-conversion-added)).
+- **A Flash save's fields can be nested, so a seeded name may be ambiguous.**
+  Learn to Fly 2's `mainprofile` holds objects, not numbers, and `player_cash`
+  exists inside all four save slots; a hand edit writes to whichever the reader
+  reaches last. The save is still one `@file` block and still parses byte-for-byte
+  ([section 14.12](#1412-what-the-fifth-conversion-added)).
 - **A Flash conversion needs both Ruffle core pairs, and a movie that is named.**
   The player picks its wasm by probing for WebAssembly extensions, so the pair a
   current browser does not use still has to ship, and `player.load()` has to be

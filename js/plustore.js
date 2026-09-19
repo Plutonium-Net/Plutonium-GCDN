@@ -1387,26 +1387,61 @@
        ever sees keys: a SharedObject name is separate from the movie's data
        path, so nothing inside the save is rewritten by this.
 
+       A movie can also pass a localPath, and then the key describes *that*
+       path instead of the movie's: Learn to Fly 3 asks for
+       getLocal("LearnToFly3/profileData", "/"), and Ruffle's format
+       "<host>/<local_path>/<#name>" collapses to
+       "127.0.0.1//#LearnToFly3/profileData" — no movie name anywhere in it.
+       Naming the movie cannot match a key like that, so the leading host is
+       dropped instead, which is the only part of the key that moves with the
+       address. (Host, not port: Ruffle keys on host_str.) Whatever the shape,
+       the part left behind is fixed text, so the save stops moving.
+
        Returns the installed area, or null if the browser refused the swap, the
        same contract as installWebStorage().
     */
     installSharedObjects: function (movie) {
       var tail = String(movie) + '/';
 
+      function hostName() {
+        return global && global.location ? String(global.location.hostname || '') : '';
+      }
+
+      /* The common shape, with the movie in it: keep the two parts that name
+         the save and drop everything before them. */
+      function byMovie(name) {
+        var at = name.lastIndexOf(tail);
+        return at < 0 ? null : name.slice(at);
+      }
+
+      /* The localPath shape, with no movie in it: drop the host. Guarded on the
+         host actually being there, so a bare name handed to getItem()/setItem()
+         by something other than Ruffle is left alone rather than decapitated. */
+      function byHost(name) {
+        var host = hostName();
+        return host && name.indexOf(host + '/') === 0 ? name.slice(host.length + 1) : name;
+      }
+
       /* Ruffle's own spelling of a name, rebuilt from where this page is
          served. It is only needed to answer a caller that enumerates the key
          space — key(i), Object.keys(localStorage) — which Ruffle itself does
          not: it composes the one key it wants and reads that. */
       function hostSpelling(name) {
-        if (!global || !global.location || name.indexOf(tail) !== 0) return name;
-        var dir = String(global.location.pathname || '').replace(/[^/]*$/, '');
-        return String(global.location.hostname || '') + dir + name;
+        if (!global || !global.location) return name;
+        var host = hostName();
+        if (byMovie(name) !== null) {
+          var dir = String(global.location.pathname || '').replace(/[^/]*$/, '');
+          return host + dir + name;
+        }
+        /* A localPath key keeps its leading slash, so this restores the
+           "//" Ruffle writes for a localPath of "/". */
+        return host + '/' + name;
       }
 
       return installArea(webStorageArea({
         to: function (name) {
-          var at = name.lastIndexOf(tail);
-          return at < 0 ? name : name.slice(at);
+          var narrowed = byMovie(name);
+          return narrowed === null ? byHost(name) : narrowed;
         },
         from: hostSpelling
       }));
