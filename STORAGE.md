@@ -211,9 +211,11 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — twenty-eight games are on PluStore
-   so far, and 5 of the 34 in this repo still load that bridge as a script tag
-   (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
+   `<script src="../../js/sync.js"></script>` — thirty games are on PluStore
+   so far, and 3 of the 34 in this repo still load that bridge as a script tag
+   (`tiny-fishing` loads neither, so it saves nothing at all yet, and
+   `soccer-random` is a build with no save to route in the first place —
+   [section 8.9](#89-a-build-with-no-save-at-all)). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
    The same applies to a **host SDK** the wrapper pulled off a CDN, which is the
@@ -279,7 +281,11 @@ A Unity 5.x export puts the same glue somewhere else: `Release/<name>.js`, besid
 `Release/<name>.asm.js`, `<name>.mem` and `<name>.data`, loaded by
 `Release/UnityLoader.js`. It is an asm.js build rather than a wasm one, but the
 file to patch and the sites inside it are the same — see
-[section 6.6](#66-the-asmjs-era-layout).
+[section 6.6](#66-the-asmjs-era-layout). An even older 5.x build ships it as
+`webgl.jsgz` beside `webgl.datagz` and `webgl.memgz`, with the page defining
+nothing but `Module` — and there the loader fetches and evaluates that file
+itself, so it is still the file to patch
+([section 6.9](#69-what-the-superhot-conversion-added)).
 
 The framework file is minified onto a handful of enormous lines. Find the
 spots by searching for these markers:
@@ -623,6 +629,86 @@ applies to **every** Unity conversion here, not just this one. A fixed port (thi
 catalogue's pages are served on 5500) never sees it, and that is why the earlier
 conversions verified clean. An inspector that lists `@dir` blocks will show a stale
 one after a port change, which is the visible sign.
+
+### 6.9 What the SUPERHOT conversion added
+
+SUPERHOT here is a Unity **5.4.0f3** IL2CPP WebGL build of the *very old*
+"compressed" layout: one `UnityLoader.js` plus `webgl.jsgz`, `webgl.datagz` and
+`webgl.memgz`, with the page defining nothing but `Module`:
+
+```js
+var Module = { TOTAL_MEMORY: 268435456, errorhandler: null, compatibilitycheck: null,
+  dataUrl: "webgl.datagz", codeUrl: "webgl.jsgz", memUrl: "webgl.memgz" };
+```
+
+**The loader names and loads the glue itself.** It runs as it is loaded: it probes
+IndexedDB with `idb.open("/idbfs-test")` and, on *either* outcome, calls
+`SetIndexedDBAndLoadCompressedJS()`, which fetches `Module.codeUrl` and evaluates
+it through a blob `<script>` tag. So the file to patch is `webgl.jsgz` — the glue
+— and it is fetched by URL rather than inlined, exactly like the asm.js era
+([section 6.6](#66-the-asmjs-era-layout)).
+
+**A `.gz` name does not mean gzip, and these three are plain.** `webgl.jsgz` is
+JavaScript text, `webgl.datagz` is a `UnityFS` bundle, `webgl.memgz` is the memory
+initializer. The loader asks for the file as it is and only falls back to its own
+`pako.inflate` — `DecompressAndLoadFile`, which appends `gz` to the *uncompressed*
+name — when that request fails. So a build whose `.gz` files were re-uploaded
+already decompressed loads fine from a server that serves the bytes straight, and
+**unzipping them is the one thing not to do.** Check the first bytes before
+touching anything: `4d 6f 64 75 6c 65` (`Module`) is not a gzip header.
+
+**The patch is four exact replacements**, because both sites are the
+[section 6.3](#63-cut-the-indexeddb-persistence) "Unity 2018" shape verbatim: the
+boot `preRun` step with its `FS.mount(IDBFS, {},"/idbfs")` and `FS.syncfs(true, …)`,
+the `var fs={numPendingSync:0,…}` helper, `_JS_FileSystem_SetSyncInterval` (whose
+`if(!Module.indexedDB) return;` gate goes and whose `setInterval` stays) and
+`_JS_FileSystem_Sync`. There is **no site 3**: the file contains exactly two
+`FS.syncfs` calls, both of them those, and `IDBFS` stays behind as unreachable
+dead code.
+
+**Two faults on the published page, neither about storage.** It reached for
+`/js/main.js` at the *site root* after the loader — a path that is in no game
+folder and does not exist anywhere in this repo. Nothing needs it: it defined the
+`UnityProgress` display, and the loader only calls that when a function of that
+name exists (`if("function"!=typeof UnityProgress)return;`), and the name appears
+nowhere in the build either. And the wrapper's canvas-resize script is an
+unclosed IIFE — it ends `resizeCanvas();` with no `})();` — so the whole inline
+script is a syntax error that never runs; the canvas is sized from CSS instead.
+The build's `webgl.jsgz` also shipped split, as `.part1` (19.9 MB) and `.part2`
+(3.5 MB), merged back into one 23,442,714-byte file so the page's fetch/XHR
+blob-merger goes away ([section 6.8](#68-what-the-slope-3-conversion-added)).
+
+**Its telemetry is the Unity 5.x SDK compiled into the player**, in
+`webgl.memgz`: `stats.unity3d.com/HWStats.cgi`,
+`stats.unity3d.com/HWStatsUpdate.cgi`, `api.uca.cloud.unity3d.com/v1/events` and
+`config.uca.cloud.unity3d.com`, the same four as Cluster Rush
+([section 6.6](#66-the-asmjs-era-layout)). The answering guard of
+[section 6.7](#67-refuse-a-request-and-answer-it) refuses them: one boot refused
+`HWStats.cgi` and nothing else — **0 off-machine requests, 0 exceptions, 0
+non-200**, with only the browser's own `/favicon.ico` probe unanswered.
+
+**Both directions, and one difference worth knowing.** On a clean profile the
+document does not stay empty for long: a 286-byte document appears holding a
+single `@unity-prefs /idbfs/PlayerPrefs` block, written by the *player* and not by
+any game code — `StatsDone=yes`, `unity.cloud_userid`,
+`unity.player_sessionid=3555775851496253260` and
+`unity.player_session_elapsed_time=0`. With `PluStore.flush` pinned so the live
+player cannot overwrite the edit ([section 6.5](#65-applying-an-imported-save)),
+seeding `pluProbe=seed42` and `pluProbeInt=4242` and reloading gives the other
+direction up: the player's own `/idbfs/PlayerPrefs` is 193 bytes and **contains
+`seed42`** — a string only the document had — and the document comes back holding
+all six entries with a **new** session id (`223018925675795080`), so both sides
+moved. The seeded int lands as four little-endian bytes, which is why only the
+string is legible in the raw file while `PluStore.prefs()` shows both
+([section 17](#17-inspecting-a-save)).
+
+The good news is that this era has **no MD5 directory**: PlayerPrefs lives at
+`/idbfs/PlayerPrefs` itself, not under a hash of the page's address, so the
+port caveat of [section 6.8](#68-what-the-slope-3-conversion-added) does not apply
+— served on 8481 the player creates the same `/idbfs/PlayerPrefs`. Only the
+document's own slot is per-origin, because it is `localStorage`. A short run
+reaches no game-owned key at all: the player's bookkeeping is the entire
+`PlayerPrefs` file even after playing into a level.
 
 ---
 
@@ -1079,6 +1165,61 @@ The project id is the one place a shared id shows up: three EO Interactive title
 Construct project id `ldz28jk2uv2f`, so all three documents list the same store
 names. Nothing mixes, because each game keeps its own document under
 `plu:text:<game>`.
+
+### 8.9 A build with no save at all
+
+`games/soccer-random/` is the case worth knowing before the next one: a C3
+export that stores nothing. Its object types are Keyboard, Audio, Mouse, Touch,
+Browser and GameMonetizeSDK — **there is no LocalStorage plugin**, no Save or
+Load event, and `C3.Plugins.LocalStorage` does not appear in the engine at all.
+Its project id is `025bjaucvn0`, so the two store names would be
+`c3-localstorage-025bjaucvn0` and `c3-savegames-025bjaucvn0`; nothing ever asks
+for either.
+
+The conversion is still worth doing — the runtime must not be left able to open
+IndexedDB the day a build does save — but the round trip has to be proven at the
+*boundary* instead of in a save, and both halves are cheap:
+
+```js
+PluStore.stores.names();        // → []        the boot asked for nothing
+await indexedDB.databases();    // → []        the lazy driver was never built
+await localforage.createInstance({ name: 'c3-localstorage-025bjaucvn0' })
+  .setItem('probe', { marker: 'soccer-random', n: 1234 });
+await localforage.setItem('default-probe', 'via the default instance');
+```
+
+The two `setItem`s drive the two construction sites of
+[section 8.5](#85-patch-the-two-construction-sites) — the named instance and the
+default global — and after a reload both come back out, one as a `json`-tagged
+object and one as a string, in `@store` blocks named for the project id. That is
+the whole claim a no-save build supports: the patched factories point at the
+document, and nothing constructed the old driver.
+
+Three things about localising *this* export are worth carrying forward.
+**`main.js` names the engine by absolute URL** — `engineScripts:["https://<host>/…/
+scripts/c3runtime.js"]` — while `scriptFolder` was already `scripts/`; that one
+URL is what decides whether the local patch runs at all
+([section 8.3](#83-make-the-engine-local-first-and-check-it)). It also carries
+`useWorker:!1`, so `workermain.js` is never fetched even though the page names
+it and the host answers 404 for it. **Its media is `.webm`-only** — fifteen
+sounds with one variant each, so there is nothing to prune, unlike Big FLAPPY's
+`ogg`/`m4a` pairs — and the fonts and icons lists are empty, so `fonts/` and
+`icons/` exist as bases with no files behind them. **The GM_SDK plugin here is
+the same one as Big NEON Tower's**, character for character: the constructor
+installs `window.SDK_OPTIONS` and injects `st39/sdk` itself, so its URL becomes
+`./gmsdk.js` and Big NEON's stand-in drops in unchanged
+([section 8.4](#84-third-party-plugins-the-engine-injects)). The build also
+carries a `GameDistribution` banner line, and a `twoplayergames.org` link, as
+plain strings in the project data — the first is a dormant "run JavaScript"
+action, the second a menu credit that only opens on a click. Neither is a
+request the page makes.
+
+Because there is no save, there is also nothing for the game to *show*: the
+check that the export itself is unharmed is a control. Loading the original
+wrapper page against its own host draws the same intro frame at the same place
+— 5333 lit pixels inside the same 192×52 box on a 1264×625 canvas in both — so
+the tiny centred logo is the export's own title art, not a conversion artifact.
+Real mouse input drives it on from there: intro → menu → pitch.
 
 ---
 
@@ -3694,6 +3835,21 @@ is what makes a re-encode safe to hand back.
   `webapp/favicon.ico`, which its own host answers 404, so the link is gone rather than
   aimed at nothing, and the browser probes `/favicon.ico` instead: one 404 per load, from
   the browser, for a page that declares no icon.
+- **A file named `.gz` need not be gzip.** Unity's old compressed layout
+  (`webgl.jsgz`, `webgl.datagz`, `webgl.memgz`) is named for a container these
+  builds often *do not* carry: the loader asks for the file as it is and only
+  falls back to inflating `<name>gz` when that request fails. A copy whose files
+  were re-uploaded already decompressed loads fine — but running it through
+  `gunzip` first destroys it, and the file to patch is the plain-text `jsgz`
+  ([section 6.9](#69-what-the-superhot-conversion-added)).
+- **A game need not have a save at all.** Soccer Random's C3 export carries no
+  LocalStorage plugin and no save event, so no engine path ever asks the patched
+  stores for anything; the conversion is still the right thing to have done (the
+  runtime must not be able to open IndexedDB later) but the evidence is a
+  boundary check rather than a round trip — an empty `stores.names()`, an empty
+  `indexedDB.databases()`, and two probes through the patched factories that
+  survive a reload ([section 8.9](#89-a-build-with-no-save-at-all)). Expect the
+  same for any build whose object types list has no storage plugin in it.
 - **Whole-document writes.** Every save rewrites the entire document. Fine for
   the few kilobytes a PlayerPrefs file holds; a game with a multi-megabyte save
   wants chunking first.
