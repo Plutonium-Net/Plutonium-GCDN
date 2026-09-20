@@ -181,13 +181,6 @@
     "cloudSync": true,
     "tags": []
   },
-  "slope-3": {
-    "description": "Roll down a neon slope at high speed while dodging gaps, walls, and sudden turns. The longer you survive, the faster and sharper the track becomes.",
-    "controls": [],
-    "banner": "images/slope-3.png",
-    "cloudSync": true,
-    "tags": []
-  },
   "snow-rider-3d": {
     "description": "Ride a sled down snowy hills while dodging trees, rocks, and other obstacles. Grab gifts when you can, but survival depends on quick steering.",
     "controls": [],

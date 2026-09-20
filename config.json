@@ -162,12 +162,6 @@
       "image": "images/motox3m-winter.png"
     },
     {
-      "id": "slope-3",
-      "name": "Slope 3",
-      "path": "games/slope-3/index.html",
-      "image": "images/slope-3.png"
-    },
-    {
       "id": "snow-rider-3d",
       "name": "Snow Rider 3D",
       "path": "games/snow-rider-3d/index.html",

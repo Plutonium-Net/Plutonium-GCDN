@@ -4125,6 +4125,23 @@ document (`games_data/saved`, under `savedGames`), and a document with no blocks
 in it is never uploaded, so a build that has not saved anything yet cannot
 erase a save that is already in the cloud.
 
+**Silence is a fault, not a status.** `plu_text_ready` is the only evidence the
+shell ever gets that a page is running the bridge, so the client waits for it: if
+it does not arrive within twelve seconds of a game loading, the save chip reads
+*No save sync* and the console names the cause. That case is not hypothetical —
+it is what a games CDN serving an **older `js/plustore.js`** looks like. The page
+saves perfectly well into its own document and posts a message nothing
+understands, so storage works, the cloud stays empty, and no error is raised
+anywhere. Both halves of this protocol are deployments. The check is the served
+bytes against the repository:
+
+```
+curl -s https://g.cdn.plutoniumnet.work/js/plustore.js | grep -c plu_text_
+```
+
+A zero means the CDN predates the bridge, and no client change can make sync
+work.
+
 ---
 
 ## 19. Reference
@@ -4189,6 +4206,13 @@ is what makes a re-encode safe to hand back.
 
 ## 20. Known limits
 
+- **A framed page that never speaks looks the same as one with nothing to
+  save.** The bridge cannot report its own absence, so a shell only learns a
+  page is not running it by the handshake failing to arrive — which is why the
+  client treats twelve seconds of silence as an error rather than an
+  empty save ([section 18.1](#181-cloud-sync-the-framed-shell)). A game whose
+  page never loads `js/plustore.js` at all is indistinguishable from a CDN
+  serving an old one from inside the frame.
 - **A Flash save is named by the player, host and all.** Ruffle keys a
   SharedObject `<domain><path>/<movie>.swf/<name>`, so the address the page was
   opened from would be part of the save's name and `localhost` and `127.0.0.1`
