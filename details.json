@@ -10,14 +10,14 @@
     "description": "Wander through eerie yellow halls and liminal rooms in a first-person Backrooms escape. Listen, navigate carefully, and look for exits before the environment gets the better of you.",
     "controls": [],
     "banner": "images/backrooms-3d.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "bacon-may-die": {
     "description": "Fight through waves of enemies as a scrappy hero with melee weapons, guns, and fast dodges. The action is silly, punchy, and built for chaotic survival runs.",
     "controls": [],
     "banner": "images/bacon-may-die.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "big-flappy-tower-tiny-square": {
@@ -31,210 +31,210 @@
     "description": "Scale an icy tower packed with slippery platforms, spikes, and tight jumps. The controls are simple, but the level asks for careful movement and steady nerves.",
     "controls": [],
     "banner": "images/big-ice-tower-tiny-square.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "big-neon-tower-tiny-square": {
     "description": "Dash through a bright neon tower full of hazards, checkpoints, and narrow platforming routes. Each section rewards clean timing and learning from mistakes.",
     "controls": [],
     "banner": "images/big-neon-tower-tiny-square.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "big-tower-tiny-square-2": {
     "description": "Return to the giant tower for another round of precise square-platforming. Expect tight jumps, traps, checkpoints, and a lot of satisfying almost-there attempts.",
     "controls": [],
     "banner": "images/big-tower-tiny-square-2.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "buckshot-roulette": {
     "description": "Face a tense tabletop duel built around a shotgun, limited items, and reading the odds. Each round is a risky mind game where one wrong call can end everything.",
     "controls": [],
     "banner": "images/buckshot-roulette.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "cluster-rush": {
     "description": "Leap across moving trucks in a first-person platforming rush where the ground never stays still. Time your jumps, ride the chaos, and reach the finish before the convoy falls apart.",
     "controls": [],
     "banner": "images/cluster-rush.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "cookie-clicker": {
     "description": "Click cookies, buy upgrades, and turn a single bakery into an absurd production empire. The fun comes from watching small gains snowball into ridiculous numbers.",
     "controls": [],
     "banner": "images/cookie-clicker.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "core-ball": {
     "description": "Launch numbered balls onto a rotating core without hitting the ones already attached. It is a simple timing puzzle that gets tense as the safe spaces disappear.",
     "controls": [],
     "banner": "images/core-ball.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "crossy-road": {
     "description": "Hop across roads, rivers, and train tracks while chasing one more step forward. The rules are instant to understand, but the timing gets dangerous fast.",
     "controls": [],
     "banner": "images/crossy-road.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "drive-mad": {
     "description": "Guide a vehicle across unstable obstacle courses filled with ramps, bumps, and awkward physics. The goal is simple, but keeping the car balanced is the real test.",
     "controls": [],
     "banner": "images/drive-mad.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "duck-life": {
     "description": "Train a duck across racing skills, earn coins, and compete in events to become a champion. The loop is part training mini-games, part gradual upgrade climb.",
     "controls": [],
     "banner": "images/duck-life.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "duck-life-2": {
     "description": "Take your duck around the world and train multiple skills for tougher races. Each practice session improves your chances when the next championship begins.",
     "controls": [],
     "banner": "images/duck-life-2.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "duck-life-3": {
     "description": "Evolve and train your duck through new skill paths before entering bigger races. It keeps the familiar training loop while adding more progression choices.",
     "controls": [],
     "banner": "images/duck-life-3.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "funny-shooter-2": {
     "description": "Blast through waves of strange enemies in a colorful first-person shooter. Unlock weapons, keep moving, and clear arenas packed with ridiculous targets.",
     "controls": [],
     "banner": "images/funny-shooter-2.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "granny": {
     "description": "Escape a locked house while a dangerous character listens for every sound you make. Search for items, solve small puzzles, and stay hidden long enough to get out.",
     "controls": [],
     "banner": "images/granny.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "learn-to-fly": {
     "description": "Help a determined penguin launch farther with gliders, rockets, and upgrades. Each run earns money for better gear, turning tiny flights into record-breaking launches.",
     "controls": [],
     "banner": "images/learn-to-fly.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "learn-to-fly-2": {
     "description": "Upgrade your penguin's launch setup and smash through obstacles on the way to longer flights. It expands the original formula with more equipment and goals to chase.",
     "controls": [],
     "banner": "images/learn-to-fly-2.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "learn-to-fly-3": {
     "description": "Build rockets and launch a penguin upward instead of just across the ice. Experiment with stages, boosters, and payloads to reach higher altitudes.",
     "controls": [],
     "banner": "images/learn-to-fly-3.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "motox3m": {
     "description": "Race a motocross bike through stunt tracks packed with loops, spikes, and explosive hazards. Fast times require both speed and careful midair control.",
     "controls": [],
     "banner": "images/motox3m.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "motox3m-2": {
     "description": "Take on more Moto X3M stunt courses with bigger hazards and tighter timing. Flip for time bonuses, land cleanly, and keep the bike moving.",
     "controls": [],
     "banner": "images/motox3m-2.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "motox3m-3": {
     "description": "Another round of Moto X3M tracks built for fast retries and risky stunts. The best runs mix aggressive acceleration with smart braking before traps.",
     "controls": [],
     "banner": "images/motox3m-3.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "motox3m-spookyland": {
     "description": "Ride through Halloween-themed Moto X3M levels filled with haunted hazards and stunt ramps. Keep your bike balanced while the course throws tricks at every landing.",
     "controls": [],
     "banner": "images/motox3m-spookyland.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "motox3m-winter": {
     "description": "Race through snowy Moto X3M stages with icy ramps, traps, and seasonal obstacles. Clean flips and controlled landings are the path to better times.",
     "controls": [],
     "banner": "images/motox3m-winter.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "slope-3": {
     "description": "Roll down a neon slope at high speed while dodging gaps, walls, and sudden turns. The longer you survive, the faster and sharper the track becomes.",
     "controls": [],
     "banner": "images/slope-3.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "snow-rider-3d": {
     "description": "Ride a sled down snowy hills while dodging trees, rocks, and other obstacles. Grab gifts when you can, but survival depends on quick steering.",
     "controls": [],
     "banner": "images/snow-rider-3d.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "soccer-random": {
     "description": "Play unpredictable ragdoll soccer where each round changes the field, players, or physics. Score five goals first, and expect every match to get weird in a new way.",
     "controls": [],
     "banner": "images/soccer-random.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "super-hot": {
     "description": "Fight through stylized combat encounters where time moves mainly when you move. Plan each step, dodge bullets, and turn split-second action into a puzzle.",
     "controls": [],
     "banner": "images/super-hot.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "the-binding-of-isaac": {
     "description": "Explore randomly generated rooms in a dark roguelike shooter filled with strange items and dangerous enemies. Each run builds a different character loadout as you push deeper underground.",
     "controls": [],
     "banner": "images/the-binding-of-isaac.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "the-worlds-hardest-game": {
     "description": "Move a small square through brutal obstacle rooms while collecting coins and reaching the goal. The challenge is pure timing, route planning, and patience.",
     "controls": [],
     "banner": "images/the-worlds-hardest-game.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "tiny-fishing": {
     "description": "Cast a line, catch fish, and upgrade your gear to reach deeper water. Each trip brings in money for better hooks, longer lines, and bigger catches.",
     "controls": [],
     "banner": "images/tiny-fishing.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   },
   "ultrakill": {
     "description": "A fast retro-styled shooter built around aggressive movement, stylish attacks, and constant momentum. Chain weapons and movement tricks to survive arenas at breakneck speed.",
     "controls": [],
     "banner": "images/ultrakill.png",
-    "cloudSync": false,
+    "cloudSync": true,
     "tags": []
   }
 }
