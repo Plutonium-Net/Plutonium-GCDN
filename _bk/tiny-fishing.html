@@ -11,7 +11,7 @@
 
   <style>
     body {
-      background: #000;
+      background: #0;
       color: #cccccc;
       margin: 0;
       padding: 0;
@@ -55,6 +55,9 @@
       border: 0;
     }
 
+    /* Login dialog box - the runner builds these for get_string() and
+       show_message(), so the styles have to be here even though the game never
+       asks for a string. */
     div.gm4html5_login {
       padding: 20px;
       position: absolute;
@@ -74,10 +77,36 @@
     }
   </style>
 
+  <!-- The save. This is a GameMaker HTML5 build of the GameMaker Studio 1.4
+       generation, so the game has no filesystem of its own: every local file is
+       one localStorage entry, written and read by three functions in tf.js, and
+       PluStore.files is the whole save (STORAGE.md sections 7 and 7.6).
+
+       filePrefix is this export's own storage prefix, read out of the runner:
+       the sanitised product name ("Tiny Fishing" -> "TinyFishing"), a dot, the
+       major version field (_Co._Lo, 0) and another dot. Naming it is what keeps
+       the document keyed by the file names the game itself uses.
+
+       Nothing has to be in place before the runner starts - a read is just a
+       function call - but the prefix does, so this goes ahead of tf.js. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'tiny-fishing', filePrefix: 'TinyFishing.0.' });
 
+    /* The guard. This export was published as a Khan Academy GameSnacks game
+       through an editmysite preview host, and its wrapper rewrote every URL on
+       its way out through a blob table: a script, an image, an audio file, a
+       fetch, an XHR. That rewriting is gone with the zip it came from, so what
+       replaces it is a refusal on the same set of surfaces. It is also five
+       different surfaces here rather than Ruffle's one, because tf.js is a DOM
+       client about as much as a fetch client.
+
+       The build carries three groups of off-machine URL strings it never needs
+       locally - an ad integration (jsd.supersonicads.com, a248.e.akamai.net), a
+       share/redirect set (dunkbrush.buyhtml5.com, twitter, valve) and a help
+       link - so this is not belt and braces the way it is for a movie with no
+       URLs in it. Nothing here may leave the machine, whatever future edit makes
+       one of them reachable. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -99,6 +128,9 @@
           refused.push(key);
           console.warn('Tiny Fishing: refused ' + what + ' outside this folder: ' + url);
         }
+        /* Answered, not left hanging: the same-origin spelling of the path, which
+           this folder does not have either. The runner's own XHR paths are
+           wrapped in try/catch and treat a failure as "no such file". */
         try {
           return location.origin + new URL(url, here).pathname;
         } catch (e) {
@@ -120,6 +152,8 @@
         return realOpen.apply(this, [method, url].concat(rest));
       };
 
+      /* The element surfaces. The runner sets these from strings it builds
+         itself, which is exactly how the preview host's files used to arrive. */
       function guardURL(proto, prop, what) {
         var desc = Object.getOwnPropertyDescriptor(proto, prop);
         if (!desc || !desc.set) return;
@@ -143,6 +177,8 @@
 
 <body dir="ltr" style="overflow: hidden;">
   <script>
+    /* Still here because the runner checks for it, and it is one line: this
+       build's ES5 shims assume the browser has it. */
     if (!Number.isNaN && window.isNaN) Number.isNaN = isNaN;
   </script>
 
@@ -154,6 +190,22 @@
     </canvas>
   </div>
 
+
+
+  <!-- The export, every file of it, in the order its own loader loaded them from
+       khanacademy.org. (The runner loads them a second time itself, from this
+       folder, because the build declares them as extensions - yph_djl.js is the
+       one of the nine with an edit in it: an unguarded dereference of a loading
+       screen element this page does not have. See the note in that file.) Upstream those nine URLs were only names: an inline zip
+       held the real files and a blob table swapped them in by file name, which
+       is why the game ran at all with its host answering for none of them. The
+       zip is extracted into this folder now and the blob table is gone, so these
+       are the files themselves.
+
+       tf.js is the runner and the game; the other eight are the extensions the
+       GML calls into: game snippets (GAMESNACKS), cookies (document.cookie),
+       canvas scaling and browser queries, fullscreen, the ZenExternal probes,
+       the loading screen, dynamic JS, and the GameSnacks score/audio bridge. -->
   <script src="gamesnacks.js"></script>
   <script src="tf.js"></script>
   <script src="tph_cookieManager.js"></script>
@@ -164,6 +216,8 @@
   <script src="bqh_djs.js"></script>
   <script src="dqh_gamesnacks.js"></script>
   <script>
+    /* The runner defines GameMaker_Init and wires nothing to window.onload, so
+       the page starts it - the same call the loader made after its nine loads. */
     GameMaker_Init();
   </script>
 </body>

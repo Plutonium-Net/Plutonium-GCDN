@@ -7,6 +7,15 @@
   <link rel="stylesheet" href="assets/css/app.css" type="text/css" />
   <title>Moto X3M</title>
 
+  <!-- The save. This game is Phaser with `phaser-super-storage`, whose adapter
+       is `localStorage` (it falls back to cookies only when localStorage is
+       missing), so it is a Web Storage game and the area swap of STORAGE.md
+       section 11 is the whole conversion. The plugin's `t.STORAGE_KEY` is
+       "mx3msf2_gm", so its keys reach the document as @file blocks the same way
+       any other localStorage key does.
+
+       This has to load before `min.js`, because the plugin picks its adapter
+       when the game boots, not on the first save. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'motox3m' });
@@ -16,6 +25,13 @@
         'would go to the browser store instead of the document');
     }
 
+    /* Nothing on this page may leave the machine. The published page pulled the
+       game from a GameMonetize host and loaded its ad SDK (st39/sdk) plus the
+       Google IMA SDK from jsDelivr; all of that is gone, but the game's own
+       loader can still be handed an absolute URL. Phaser fetches through
+       XMLHttpRequest and, for images, `Image.src`, so both are refused. Same
+       origin, `data:` and `blob:` pass; anything else is rejected once per URL
+       with a warning. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -83,6 +99,12 @@
   <div id="orientation"></div>
   <div id="loader">Loading ...</div>
 
+  <!-- Every library below is the same file the GameMonetize host served, pulled
+       into assets/lib/ beside this page; the `<base>`/absolute CDN URLs are gone.
+       The published page also loaded the Google IMA ad SDK and the GameMonetize
+       SDK from jsDelivr - the game only listens for the SDK's
+       `SDK_GAME_START`/`SDK_GAME_PAUSE` events, so with no SDK those never fire
+       and nothing is missed. -->
   <script type="text/javascript" src="assets/lib/nape.min.js">
     var nape = "nape.min.js";
   </script>

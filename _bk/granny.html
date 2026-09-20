@@ -7,14 +7,36 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <title>Granny Original</title>
 
+  <!-- The save. Granny's is PlayerPrefs in the player's own /idbfs, which the
+       patched glue hands to PluStore instead of IndexedDB — see
+       ../../STORAGE.md, section 6. -->
   <script src="../../js/plustore.js"></script>
   <script>PluStore.configure({ game: 'granny', mount: '/idbfs' });</script>
 
+  <!-- The build calls three Yandex SDK imports of its own, from inside the
+       compiled glue, so something has to answer `YaGames` before the player
+       runs. This is that something, and it explains what the real SDK does
+       here. -->
   <script src="yandex-sdk-local.js"></script>
 
+  <!-- The old storage method is gone, and so is the CDN. This page used to be a
+       wrapper: every path below pointed at a jsDelivr folder, js/sync.js
+       carried the save off to a server, `sdk.js` loaded the real Yandex SDK
+       from that CDN, and a second injected script fetched GameMonetize's
+       `sedk.js` — a file that does not exist in its own repository (jsDelivr
+       answers "Couldn't find the requested file"). Nothing here leaves the
+       machine now. -->
   <link rel="stylesheet" href="TemplateData/style.css">
 
   <script>
+    /* Nothing on this page belongs off the machine, so nothing is allowed off
+       it. This is a Unity 2021 build, and a player of that era carries its own
+       telemetry: the compiled player reports to Unity's analytics endpoints
+       from inside the wasm image, where it cannot be edited out. A refused
+       request looks to the player exactly like an offline one, which is what a
+       local copy is. Relative and same-origin URLs are the whole game — the
+       build, its parts, the merged blob URLs, the streaming audio — so those
+       pass. */
     (function () {
       function allowed(url) {
         var text = String(url === undefined || url === null ? '' : url);
@@ -146,6 +168,12 @@
   </div>
 
   <script>
+    /* The build ships its data and its wasm split in two parts each, and Unity's
+       loader asks for each of them under a name that does not exist on disk —
+       `Granny.data`, `Granny.wasm`. This is the wrapper's own scheme, kept as
+       it was: merge the parts into one buffer, hand the loader a blob URL, and
+       move the progress bar while doing it. Only the URLs under it changed,
+       from the CDN to this folder. */
     async function mergeUnityWebFiles(baseUrl, filePrefix, totalParts, extension) {
       const partUrls = [];
       for (let i = 1; i <= totalParts; i++) {
@@ -183,6 +211,8 @@
     var progressBarFull = document.querySelector("#unity-progress-bar-full");
     var warningBanner = document.querySelector("#unity-warning");
 
+    /* The glue sends its ad messages to this name, so it is the page that owns
+       it. */
     let myGameInstance = null;
 
     function unityShowBanner(msg, type) {

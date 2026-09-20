@@ -7,13 +7,6 @@
   <link rel="stylesheet" href="assets/css/app.css" type="text/css" />
   <title>MotoX3M 6 Spooky Land</title>
 
-  <!-- The save. Same engine and the same plugin as the other Moto X3M
-       conversions - Phaser with `phaser-super-storage`, whose adapter is chosen
-       once at boot (`isLocalStorageSupport() ? LocalStorage : CookieStorage`).
-       This build's `STORAGE_KEY` is `mx3m_6_gm`, so its keys (`mx3m_6_gm` and
-       `mx3m_6_gmh`) reach the document as @file blocks under their own names.
-
-       Loaded before the game boots, because the plugin picks its adapter once. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'motox3m-spookyland' });
@@ -22,14 +15,6 @@
       console.error('MotoX3M Spooky Land: window.localStorage could not be swapped ' +
         '- the save would go to the browser store instead of the document');
     }
-
-    /* Nothing on this page may leave the machine. The published page pulled every
-       script and the game itself from a third-party preview host, loaded the
-       Google IMA ad SDK and the GameMonetize SDK from jsDelivr, and carried the
-       old js/sync.js. All of that is gone, but the game's own loader can still be
-       handed an absolute URL, and Phaser loads through both `XMLHttpRequest` and
-       `fetch`, so both are refused. Same origin, `data:` and `blob:` pass;
-       anything else is rejected once per URL with a warning. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -75,12 +60,6 @@
   <div id="orientation"></div>
   <div id="loader">Loading ...</div>
 
-  <!-- Every file below is the same copy the GameMonetize host served, pulled into
-       assets/lib/ beside this page; the absolute CDN URLs are gone. The Google IMA
-       ad SDK and the GameMonetize SDK were dropped - the game only listens for the
-       SDK's `SDK_GAME_START`/`SDK_GAME_PAUSE` events, so with no SDK nothing fires
-       and nothing is missed. The wrapper's `js/sync.js`, its Google Analytics tag
-       and its empty trailing `<script>` are gone. -->
   <script type="text/javascript" src="assets/lib/nape.min.js">
     var nape = "assets/lib/nape.min.js";
   </script>

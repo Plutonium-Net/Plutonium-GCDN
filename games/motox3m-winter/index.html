@@ -7,13 +7,6 @@
   <link rel="stylesheet" href="assets/css/app.css" type="text/css" />
   <title>Moto X3M Winter Unblocked</title>
 
-  <!-- The save. Same engine and the same plugin as the rest of the Moto X3M
-       family - Phaser with `phaser-super-storage`, adapter chosen once at boot
-       (`isLocalStorageSupport() ? LocalStorage : CookieStorage`). This build's
-       `STORAGE_KEY` is `mx3m_4_gd`, so its keys (`mx3m_4_gd` and `mx3m_4_gdh`)
-       reach the document as @file blocks under their own names.
-
-       Loaded before the game boots, because the plugin picks its adapter once. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'motox3m-winter' });
@@ -23,12 +16,6 @@
         'the save would go to the browser store instead of the document');
     }
 
-    /* Nothing on this page may leave the machine. The published page reached the
-       whole game through a `<base href>` pointing at jsDelivr, and the game file
-       carried its own base too; all of that is rewritten to this folder, but
-       Phaser loads through both `XMLHttpRequest` and `fetch`, so both are refused
-       here. Same origin, `data:` and `blob:` pass; anything else is rejected once
-       per URL with a warning. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -74,13 +61,6 @@
   <div id="orientation"></div>
   <div id="loader">Loading ...</div>
 
-  <!-- Every file below is the pinned jsDelivr copy (bubbls/UGS-Assets commit
-       9cf4332, the `moto winter/` folder), pulled local and verified by git blob
-       hash, with the CDN `<base>` gone so these relative paths resolve inside this
-       folder. `motox3m4.min.js` bundles Phaser and loads its two plugins
-       (`phaser-cachebuster.min.js`, `phaser-super-storage.min.js`) and
-       `assets/box2dweb/dragonBones.min.js` from this folder at run time. The
-       wrapper's `js/sync.js` is gone. -->
   <script type="text/javascript" src="assets/box2dweb/nape.min.js">
     var nape = "assets/box2dweb/nape.min.js";
   </script>

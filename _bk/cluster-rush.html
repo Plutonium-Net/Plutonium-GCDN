@@ -10,6 +10,12 @@
   <script>PluStore.configure({ game: 'cluster-rush', mount: '/idbfs' });</script>
 
   <script>
+    /* The build carries Unity's own telemetry: it POSTs hardware stats to
+       stats.unity3d.com and talks to Unity Cloud Analytics (config.uca and
+       api.uca). Both are made from inside the compiled player, so they cannot
+       be removed without editing the heap image — they are refused here
+       instead. The player treats a failed request as a failed request, which is
+       what an offline player saw anyway. */
     (function () {
       var BLOCK = /(^|\.)unity3d\.com$/;
       function blocked(url) {

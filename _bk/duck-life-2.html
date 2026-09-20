@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Learn to Fly 3</title>
+  <title>Duck Life 2: World Champion</title>
   <style>
     html, body {
       margin: 0;
@@ -39,15 +39,39 @@
     }
   </style>
 
+  <!-- The save. Ruffle keeps every Flash save - a SharedObject - in localStorage:
+       its wasm carries a `ruffle_web::storage::LocalStorageBackend` and reaches
+       the browser through `window.localStorage`. Swapping the area before Ruffle
+       initialises is therefore the whole conversion, the same shape as any other
+       Web Storage engine (STORAGE.md section 11, and section 14 for this one).
+
+       The movie asks for `SharedObject.getLocal("mydata")`, the same slot name
+       Duck Life 1 used, but Ruffle names a slot after the movie's own URL -
+       "127.0.0.1/games/duck-life-2/duck-life-2.swf/mydata" - so the host the page
+       was opened from would otherwise be part of the save's name. Naming the
+       movie narrows that to "duck-life-2.swf/mydata".
+
+       This has to come before `ruffle.min.js`, because the player reads a movie's
+       save as it loads it. -->
   <script src="../../js/plustore.js"></script>
   <script>
-    PluStore.configure({ game: 'learn-to-fly-3' });
-    var storage = PluStore.installSharedObjects('learn-to-fly-3.swf');
+    PluStore.configure({ game: 'duck-life-2' });
+    var storage = PluStore.installSharedObjects('duck-life-2.swf');
     if (!storage) {
-      console.error('Learn to Fly 3: window.localStorage could not be swapped - ' +
+      console.error('Duck Life 2: window.localStorage could not be swapped - ' +
         'the save would go to the browser store instead of the document');
     }
 
+    /* Nothing on this page may leave the machine. Unlike Duck Life 1 this build
+       carries no MochiAds stub, but it does carry a CPMStar ad spot
+       (`server.cpmstar.com`) and a set of Bubblebox / Newgrounds / GameShed
+       tracking URLs that it pings on screen transitions, plus a GameShed
+       achievement API. All of them live *inside the SWF*, so there is nothing to
+       delete in a script; refusing the request changes nothing the game does -
+       none of those hosts answers a plain request without CORS headers today
+       anyway - it only stops the page from telling third parties that the game
+       was opened. Ruffle fetches through `window.fetch` and never through
+       XMLHttpRequest, so that one call is the whole surface. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -69,13 +93,25 @@
         if (local(url)) return realFetch.apply(this, arguments);
         if (refused.indexOf(url) < 0) {
           refused.push(url);
-          console.warn('Learn to Fly 3: refused a request outside this folder: ' + url);
+          console.warn('Duck Life 2: refused a request outside this folder: ' + url);
         }
-        return Promise.reject(new TypeError('Learn to Fly 3: only this folder is reachable (' + url + ')'));
+        return Promise.reject(new TypeError('Duck Life 2: only this folder is reachable (' + url + ')'));
       };
     })();
   </script>
 
+  <!-- Ruffle, vendored from the release this page already pinned
+       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
+       beside it) with the core glue and the wasm it fetches from this folder at
+       run time. The published page took ruffle.min.js from jsDelivr and carried
+       the save off through js/sync.js; neither is here any more.
+
+       Both core pairs are kept, and both are needed: ruffle.min.js probes
+       WebAssembly.validate() for SIMD and four other extensions and loads
+       core.ruffle.ae105... + f7f28e....wasm when all five are present, falling
+       back to core.ruffle.9085... + 4d8824....wasm otherwise ("falling back to
+       the vanilla WebAssembly module"). A browser without SIMD is 13 MB of unused
+       files; a browser without the pair it needs has no player at all. -->
   <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>
@@ -94,13 +130,13 @@
     function resizeGame() {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
-      const aspectRatio = 4 / 3;
+      const aspectRatio = 5.5 / 3;
 
-      let width = Math.floor(windowWidth);
+      let width = Math.floor(windowWidth * 1);
       let height = Math.floor(width / aspectRatio);
 
-      if (height > windowHeight) {
-        height = Math.floor(windowHeight);
+      if (height > windowHeight * 1) {
+        height = Math.floor(windowHeight * 1);
         width = Math.floor(height * aspectRatio);
       }
 
@@ -126,7 +162,10 @@
         player.style.height = '100%';
         player.style.background = 'black';
         container.appendChild(player);
-        player.load(new URL('learn-to-fly-3.swf', location.href).href);
+        /* The published page called player.load("$1"). Its wrapper was never
+           filled in, so Ruffle was handed a four-character string where a movie
+           belongs, and nothing ever started. */
+        player.load('duck-life-2.swf');
       } else {
         container.textContent = 'Ruffle failed to load.';
       }

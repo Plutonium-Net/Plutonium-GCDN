@@ -39,19 +39,6 @@
     }
   </style>
 
-  <!-- The save. Ruffle keeps every Flash save — a SharedObject — in localStorage:
-       its wasm carries a `ruffle_web::storage::LocalStorageBackend` and reaches
-       the browser through `window.localStorage`. Swapping the area before Ruffle
-       initialises is therefore the whole conversion, the same shape as any other
-       Web Storage engine (STORAGE.md section 11, and section 14 for this one).
-
-       installSharedObjects is the Ruffle-shaped version: Ruffle names a slot
-       after the movie's own URL — "127.0.0.1/games/duck-life/duck-life.swf/
-       mydata" — so the host the page was opened from would otherwise be part of
-       the save's name. Naming the movie narrows that to "duck-life.swf/mydata".
-
-       This has to come before `ruffle.min.js`, because the player reads a
-       movie's save as it loads it. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'duck-life' });
@@ -60,16 +47,6 @@
       console.error('Duck Life: window.localStorage could not be swapped — ' +
         'the save would go to the browser store instead of the document');
     }
-
-    /* Nothing on this page may leave the machine. Duck Life is a Mochi-era
-       build: the movie carries MochiAds' preloader stub, which fetches
-       http://x.mochiads.com/srv/1/<id>.swf and pings http://mochibot.com/my/
-       core.swf every time the game is opened. Both sit *inside the SWF*, which
-       is why this is a guard here rather than a deletion in a script — and both
-       fail today anyway (a dead host sends no CORS headers), so refusing them
-       changes nothing the game does; it only stops the page from telling two
-       third parties that it was opened. Ruffle fetches through `window.fetch`
-       and never through XMLHttpRequest, so that one call is the whole surface. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -98,18 +75,6 @@
     })();
   </script>
 
-  <!-- Ruffle, vendored from the release this page already pinned
-       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
-       beside it) with the core glue and the wasm it fetches from this folder at
-       run time. The published page took ruffle.min.js from jsDelivr and carried the
-       save off through js/sync.js; neither is here any more.
-
-       Both core pairs are kept, and both are needed: ruffle.min.js probes
-       WebAssembly.validate() for SIMD and four other extensions and loads
-       core.ruffle.ae105… + f7f28e….wasm when all five are present, falling back
-       to core.ruffle.9085… + 4d8824….wasm otherwise ("falling back to the vanilla
-       WebAssembly module"). A browser without SIMD is 13 MB of unused files; a
-       browser without the pair it needs has no player at all. -->
   <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>

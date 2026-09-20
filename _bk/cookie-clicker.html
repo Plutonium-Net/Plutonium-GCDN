@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=900, initial-scale=1">
   <title>Cookie Clicker</title>
+  <!--
+Code and graphics copyright Orteil, 2013-2026
+Feel free to alter this code to your liking, but please do not re-host it, do not profit from it and do not present it as your own.
+-->
   <link rel="shortcut icon" href="img/favicon.ico" />
   <link href="style.css?v=10c" rel="stylesheet" type="text/css">
 
@@ -13,20 +17,39 @@
     var SAVESUFFIX='';
     var App=typeof App==='undefined'?0:App;
     var PRESETMODS=[];
+    /* This build is local: every asset sits beside this file and nothing is
+       fetched from anywhere else. LOCAL is the game's own switch — ajax(),
+       getJson(), the ad slots, the update check and the resource path all
+       test it — so pinning it true is what makes the game offline on any
+       host, not just on localhost where the original happened to default. */
     var LOCAL=true;
   </script>
+
+  <!-- The cookie-consent loader, the Facebook pixel and the
+       original host's @font-face URLs were here. All three are
+       remote, and all three were already skipped when LOCAL was
+       true, so the build has no use for them. The page falls
+       back to its own fonts. -->
 
   <script src="base64.js"></script>
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'cookie-clicker' });
 
+    /* The game saves through localStorage — CookieClickerGame, a second slot
+       for the beta, and CookieClickerLang — and it also calls localStorage
+       directly in a few places, so the area itself is replaced rather than
+       the helpers. After this line every one of those reads and writes is an
+       @file block in the PluStore document, and the browser's own store is
+       unreachable from this page. Must run before main2.js, which reads the
+       save while it loads. */
     var pluStorage = PluStore.installWebStorage();
     if (!pluStorage) console.error('PluStore could not take over localStorage; this save would be lost');
   </script>
 
   <script src="main2.js?v=13g"></script>
 
+  <!-- ad -->
   <script type="text/javascript">
     if (LOCAL)
     {
@@ -39,14 +62,31 @@
       }
     }
   </script>
+  <!-- The Google ad loader and the adblock-detector stub were here. The
+       stub above is kept on purpose: the game's layout code calls
+       adsbygoogle, and with LOCAL true the stub is what answers it. The
+       game adds its own `noAds` class and lays the page out without the
+       ad column. -->
+  <!-- /ad -->
 
+  <!--[if IE]>
+  <style type="text/css">
+    #ifIE9{display:block;}
+  </style>
+  <![endif]-->
+
+  <!--[if lt IE9]><script src="excanvas.compiled.js"></script><![endif]-->
 </head>
 <body>
 
   <div id="wrapper">
 
     <div id="topBar">
+      <!--<div><a href="//dashnet.org" target="_blank" id="topbarDashnet">DashNet</a></div>-->
+      <!--<div style="width:80px;"><div style="width:80px;height:32px;background:url(img/DashnetLogoTiny.png);position:absolute;left:0px;top:0px;pointer-events:none;opacity:0.5;"></div><a style="opacity:0;" href="//dashnet.org" target="_blank" id="topbarDashnet">DashNet</a></div>-->
       <div style="padding:0px;height:100%;"><a style="background:linear-gradient(0deg,rgba(95,22,255,0.5),rgba(182,22,255,0.25));height:24px;display:inline-block;padding:8px;padding-bottom:0px;font-variant:small-caps;color:#b76fff;text-shadow:0px 1px 2px #1b0031;" href="//dashnet.org" target="_blank" id="topbarDashnet">DashNet</a></div>
+      <!--<div style="padding-left:58px;"><div style="width:56px;height:32px;background:url(img/CookieClickerLogoTiny.png);position:absolute;left:4px;top:0px;pointer-events:none;opacity:0.5;"></div>&trade; &copy; <a href="//orteil.dashnet.org" target="_blank" id="topbarOrteil">Orteil</a>, 2025</div>-->
+      <!--<div><b style="font-weight:bold;">Cookie Clicker</b>&trade; &copy; <a href="//orteil.dashnet.org" target="_blank" id="topbarOrteil">Orteil</a>, 2025</div>-->
       <div><a href="">Cookie Clicker</a>&trade; &copy; <a href="//orteil.dashnet.org" target="_blank" id="topbarOrteil">Orteil</a>, 2026</div>
       <div><a href="https://orteil42.tumblr.com" target="_blank" id="topbarTumblr">tumblr</a></div>
       <div><a href="https://orteil42.bsky.social" target="_blank" id="topbarTwitter">bluesky</a></div>
@@ -55,6 +95,8 @@
       <div style="position:relative;display:none;font-weight:bold;" id="heralds"><div style="position:absolute;top:-4px;width:31px;height:39px;background:url(img/heraldFlag.png);left:50%;margin-left:-15px;pointer-events:none;"></div><div id="heraldsAmount" style="position:relative;z-index:10;text-shadow:0px 1px 0px #000,0px 0px 6px #ff00e4;color:#fff;">-</div></div>
       <div><a class="lightblueLink" style="font-weight:bold;" href="https://play.google.com/store/apps/details?id=org.dashnet.cookieclicker" target="_blank" id="topbarMobileCC">Cookie Clicker for Android</a></div>
       <div><a class="lightblueLink" style="font-weight:bold;" href="https://store.steampowered.com/app/1454400/Cookie_Clicker/" target="_blank" id="topbarSteamCC">Cookie Clicker on Steam</a></div>
+      <!--<div><a href="//orteil.dashnet.org/randomgen/" target="_blank" id="topbarRandomgen">RandomGen</a></div>
+      <div><a href="//orteil.dashnet.org/igm/" target="_blank" id="topbarIGM">Idle Game Maker</a></div>-->
       <div style="float:right;position:relative;"><div id="tinyglobe" style="position:absolute;top:-4px;width:22px;height:22px;background:url(img/tinyglobeSheet.gif);right:4px;top:4px;pointer-events:none;"></div><a id="changeLanguage" style="font-variant:small-caps;padding-right:20px;" onmouseover="INTERVAL_TINYGLOBE=setInterval(function(){var tinyglobe=document.getElementById('tinyglobe');tinyglobe.style.backgroundPosition=(parseInt(tinyglobe.style.backgroundPosition)-22)+'px';},30);" onmouseout="clearInterval(INTERVAL_TINYGLOBE);">Change language</a><script>document.getElementById('tinyglobe').style.backgroundPosition=(-[0,19,27][Math.floor(Math.random()*3)]*22)+'px';</script></div>
       <div id="topbarOtherVersions" style="float:right;z-index:10000000;" class="hoverer">
         Other versions
@@ -77,8 +119,8 @@
             <div class="spinnySmall"></div>
             <div id="loading" class="title">Loading...</div>
             <div id="failedToLoad" class="title">This is taking longer than expected.<br>
-            <div style="font-size:65%;line-height:120%;">Slow connection? If not, please make sure your javascript is enabled, then refresh.<br>
-            If problems persist, this might be on our side - wait a few minutes, then hit ctrl+f5!</div></div>
+            <div style="font-size:65%;line-height:120%;"><!-- error -->Slow connection? If not, please make sure your javascript is enabled, then refresh.<br>
+            If problems persist, this might be on our side - wait a few minutes, then hit ctrl+f5!<!-- /error --></div></div>
             <div id="ifIE9" class="title" style="font-size:100%;line-height:120%;">Your browser may not be recent enough to run Cookie Clicker.<br>You might want to update, or switch to a more modern browser such as Chrome or Firefox.</div>
           </div>
         </div>
@@ -144,7 +186,9 @@
       </div>
     
       <div id="sectionRight" class="inset">
+        <!-- ad -->
         <div class="ifNoAds" style="width:300px;text-align:center;padding:8px 0px;background:rgba(0,0,0,0.95);font-size:10px;opacity:0.5;text-shadow:0px 0px 2px #000,0px 1px 0px #000;text-align:center;">
+          <!--Cookie Clicker is mainly supported by ads.<br>Consider unblocking our site!-->
         </div>
         <div id="smallSupport" style="width:300px;text-align:center;padding-bottom:40px;background:rgba(0,0,0,0.5);position:relative;z-index:100;">
         
@@ -152,6 +196,7 @@
         
           <div class="supportComment">&#11165; Sponsored link &#11165;</div>
         </div>
+        <!-- /ad -->
         <div id="store">
           <div id="storeTitle" class="inset title zoneTitle">Store</div>
           <div id="toggleUpgrades" class="storeSection upgradeBox"></div>
@@ -160,6 +205,7 @@
           <div id="upgrades" class="storeSection upgradeBox"></div>
           <div id="products" class="storeSection"></div>
         </div>
+        <!-- ad -->
         <div id="detectAds" class="adBanner" style="background:transparent;width:1px;height:1px;"></div>
         <div id="support" style="margin-top:130px;">
           <div class="supportComment">&#11167; Sponsored links &#11167;</div>
@@ -182,6 +228,7 @@
           
           </div>
         </div>
+        <!-- /ad -->
       </div>
     
       <div id="tooltipAnchor"><div id="tooltip" class="framed" onMouseOut="Game.tooltip.hide();"></div></div>
@@ -191,5 +238,7 @@
 
   </div>
 
+  <!-- The host's Cloudflare challenge script was here; it loads from
+       /cdn-cgi/, which only exists on that host. -->
 </body>
 </html>

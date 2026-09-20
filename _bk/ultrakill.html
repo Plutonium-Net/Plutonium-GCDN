@@ -25,12 +25,47 @@
     }
   </style>
 
+  <!-- The save. This is a Unity WebGL build, so the game's PlayerPrefs (and
+       anything it writes to persistentDataPath) lives in the player's /idbfs
+       mount, and the two functions that keep it are PluStore.boot and
+       PluStore.flush (STORAGE.md section 6).
+
+       This is the modern "autoPersist" layout rather than the 2018/2019 one, so
+       the mount is the only place persistence is switched on - IDBFS itself is
+       wrapped by the player's own injectIndexedDBToAutomaticallyPersist() - and
+       three sites in the framework were cut over: the mount, the periodic tick,
+       and the manual JS_FileSystem_Sync call.
+
+       PluStore has to be up before the loader runs, because the framework is
+       evaluated inside createUnityInstance() and mounts /idbfs the moment it
+       starts. -->
   <script src="../../js/plustore.js"></script>
   <script>
+    /* `skip` leaves the build's telemetry out of the save. This one has Unity's
+       Analytics service compiled in (its project id is baked into the player
+       and every event it queues carries a user id and an identity token), so
+       on top of its PlayerPrefs the player writes a tree of
+       /idbfs/<hash>/Unity/<project id>/Analytics/ArchivedEvents/<event>/ files
+       — a few kilobytes of them per session, waiting for an endpoint the guard
+       below refuses. They are not the save and the game never reads them back,
+       so the document keeps the PlayerPrefs and drops the rest. */
     PluStore.configure({
       game: 'ultrakill',
       skip: [/\/Unity\/[0-9a-f-]{36}\/Analytics(\/|$)/]
     });
+
+    /* The guard. The published page was a wrapper around a jsDelivr folder -
+       <base href="https://cdn.jsdelivr.net/gh/genizy/web-port@master/ultrakill/">
+       - which is dead twice over today: the repository renamed its branch to
+       main, and jsDelivr answers 403 for that whole user. The build is local
+       now, and nothing here may leave the machine.
+
+       Unity's loader fetches its framework, its data and its wasm through
+       fetch/XHR, so both are guarded; the element surfaces are guarded too,
+       because a Unity build can still set a script src or an image src from a
+       string it composes. A refused request is answered with the same-origin
+       spelling of its path, which this folder does not have either: the loader
+       treats that as a failed file, which is how it would see a 404. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -98,6 +133,11 @@
   <div id='loading-text' style="color: black; font-family: cursive; font-size: 48px; text-align: center; margin-top: 20px;">LOADING...</div>
   <canvas id="unity-canvas" tabindex="-1" hidden></canvas>
 
+  <!-- The loader, local. The published page took the whole build from a moving
+       <base href> and merged the split data and wasm at run time with a
+       fetch/blob helper; the parts are concatenated on disk now - one 73 MB
+       data file from four parts, one 24 MB wasm from two - so there is nothing
+       left to merge and no blob URLs in the path. -->
   <script src="Build/ultrakill.loader.js"></script>
   <script>
     var canvas = document.querySelector("#unity-canvas");

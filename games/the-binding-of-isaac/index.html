@@ -39,19 +39,6 @@
     }
   </style>
 
-  <!-- The save. This is a Flash build - one SWF, played by Ruffle - so its save is
-       a SharedObject, and Ruffle keeps SharedObjects in localStorage. Swapping the
-       area before Ruffle initialises is the whole conversion (STORAGE.md sections
-       11 and 14).
-
-       installSharedObjects is the Ruffle-shaped version of that swap: Ruffle names
-       a slot after the movie's own URL - "<host>/games/the-binding-of-isaac/
-       BiWrath.swf/<name>" - so the host the page was opened from would otherwise be
-       part of the save's name. Naming the movie narrows that to
-       "BiWrath.swf/<name>".
-
-       This has to come before `ruffle.min.js`, because the player reads a movie's
-       save as it loads it. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'the-binding-of-isaac' });
@@ -61,11 +48,6 @@
         'the save would go to the browser store instead of the document');
     }
 
-    /* The movie carries no outbound request of its own - there is no URL string in
-       it at all, no ad preloader and no portal SDK - so there is nothing to refuse.
-       This guard is belt and braces: the page must not be able to leave the
-       machine, whoever edits the movie or the player later. Ruffle fetches through
-       `window.fetch`, and that one call is the whole surface. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -94,16 +76,6 @@
     })();
   </script>
 
-  <!-- Ruffle, vendored from the release the other Flash pages use
-       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
-       beside it) with the core glue and the wasm it fetches from this folder at run
-       time. The published page took ruffle.min.js from jsDelivr and carried the
-       save off through js/sync.js; neither is here any more.
-
-       Both core pairs are kept, and both are needed: ruffle.min.js probes
-       WebAssembly.validate() for SIMD and four other extensions, and loads
-       core.ruffle.ae105... + f7f28e....wasm when all five are present, falling back
-       to core.ruffle.9085... + 4d8824....wasm otherwise. -->
   <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>
@@ -119,8 +91,6 @@
     const boxLeft = document.getElementById('box-left');
     const boxRight = document.getElementById('box-right');
 
-    /* The movie's own stage, read out of the SWF header: 800x600, so 4/3. The
-       published page used the wrapper's 5.5/3 and stretched it. */
     const aspectRatio = 4 / 3;
 
     function resizeGame() {
@@ -157,9 +127,6 @@
         player.style.height = '100%';
         player.style.background = 'black';
         container.appendChild(player);
-        /* The published page called player.load("$1"). Its wrapper was never
-           filled in, so Ruffle was handed a four-character string where a movie
-           belongs and nothing ever started. */
         player.load('BiWrath.swf');
       } else {
         container.textContent = 'Ruffle failed to load.';

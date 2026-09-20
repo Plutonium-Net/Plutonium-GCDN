@@ -7,6 +7,16 @@
   <link rel="stylesheet" href="apap.css" type="text/css" />
   <title>Moto X3M 3</title>
 
+  <!-- The save. Same engine and the same plugin as the other two Moto X3M
+       conversions - Phaser with `phaser-super-storage` - whose adapter is chosen
+       once at boot: `isLocalStorageSupport() ? LocalStorage : CookieStorage`. The
+       probe passes against the installed area, so this is a Web Storage game and
+       the area swap of STORAGE.md section 11 is the whole conversion. This build's
+       keys are `mx3m3sf2_vseigru` and `mx3m3sf2sfx` (plus the `h` companions).
+
+       This has to load before the game boots, because the plugin picks its adapter
+       once - and here the plugin is loaded by the game itself, from a local script
+       the page does not name. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'motox3m-3' });
@@ -16,6 +26,14 @@
         'save would go to the browser store instead of the document');
     }
 
+    /* Nothing on this page may leave the machine. The published page loaded all
+       six libraries and the game itself from `cdn.jsdelivr.net/gh/bubbls/ruffle`
+       by absolute URL, and the game's own file carried twenty absolute URLs to an
+       editmysite host (every level, sprite, atlas, sound and the DragonBones
+       script) plus two npm URLs for its plugins. All of those are rewritten to
+       this folder, but Phaser loads through both `XMLHttpRequest` and `fetch`, so
+       both are refused here too. Same origin, `data:` and `blob:` pass; anything
+       else is rejected once per URL with a warning. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -61,6 +79,13 @@
   <div id="orientation"></div>
   <div id="loader">Loading ...</div>
 
+  <!-- Every file below is the pinned jsDelivr copy (bubbls/ruffle commit
+       58d9d253), pulled local and verified by git blob hash, with the CDN URLs
+       replaced by relative ones. `moto3.js` is the game: it bundles Phaser and
+       loads its two plugins (`phaser-cachebuster.min.js`,
+       `phaser-super-storage.min.js`) and `assets/box2dweb/dragonBones.min.js`
+       from this folder at run time. The wrapper's `js/sync.js`, its Google
+       Analytics tag and its empty trailing `<script>` are gone. -->
   <script type="text/javascript" src="napem.js">
     var nape = "napem.js";
   </script>

@@ -8,11 +8,24 @@
 
   <link rel="stylesheet" href="style/style.css">
 
+  <!-- The save. Slope 3 is a Unity WebGL build (2019.4.24f1), so its save is
+       the player's own IDBFS tree, one file per PlayerPrefs value, and the two
+       edits that matter are in the glue beside this page (see STORAGE.md
+       section 6). This has to load before the player: it reads PlayerPrefs as it
+       boots, so PluStore must exist before UnityLoader.instantiate runs. -->
   <script src="../../js/plustore.js"></script>
   <script>
     PluStore.configure({ game: 'slope-3' });
   </script>
 
+  <!-- Nothing on this page may leave the machine, and this player carries its
+       own telemetry (the Unity cloud endpoints baked into the wasm). A refused
+       request must be *answered*, never broken: a failed UnityWebRequest can
+       throw inside managed main(), which aborts the whole runtime, and a blocked
+       POST that keeps its method fails again because a blob URL cannot be posted
+       to. So every refusal is an empty 200 - via fetch, via XHR rewritten to GET,
+       and via sendBeacon - which is what an offline machine looks like. See
+       STORAGE.md section 6.7. -->
   <script>
     (function () {
       var here = location.protocol + '//' + location.host;
@@ -40,6 +53,7 @@
         var url = typeof input === 'string' ? input : (input && input.url) || '';
         if (allowed(url)) return realFetch.apply(this, arguments);
         refuse(url);
+        /* An answer, not a rejection: an empty body the caller can read. */
         return Promise.resolve(new Response(new Blob([], { type: 'application/octet-stream' }), { status: 200 }));
       };
 
@@ -48,11 +62,12 @@
       XMLHttpRequest.prototype.open = function (method, url) {
         if (allowed(url)) return open.apply(this, arguments);
         refuse(url);
+        /* GET, not the caller's method: a blob URL is readable, not postable. */
         this.pluBlocked = URL.createObjectURL(new Blob([], { type: 'application/octet-stream' }));
         return open.apply(this, ['GET', this.pluBlocked].concat(Array.prototype.slice.call(arguments, 2)));
       };
       XMLHttpRequest.prototype.send = function () {
-        if (this.pluBlocked) return send.call(this);
+        if (this.pluBlocked) return send.call(this); /* no body is forwarded */
         return send.apply(this, arguments);
       };
 
@@ -74,6 +89,7 @@
     </div>
   </div>
 
+  <!-- The game's own callbacks, unchanged from the export. -->
   <script>
     function UnityCallJs() { console.log("unity call!"); }
     function UnityCallPlayJs() { console.log("untiy call Play game"); }
@@ -85,6 +101,13 @@
     function UnityCallCloseLeaderboardJs() { console.log("untiy call close leaderboard"); }
   </script>
 
+  <!-- The loader and the player glue are the pinned jsDelivr copies
+       (bubbls/UGS-Assets commit 9cf4332, the `slope 3/` folder), pulled local and
+       verified by git blob hash. The split `Slope3.data.unityweb.part1/part2`
+       were merged back into one `Slope3.data.unityweb` beside this page, so the
+       page's runtime file-merger shim and its `<base href>` at jsDelivr are both
+       gone; the old `js/sync.js` is gone too. `Slope3.wasm.framework.unityweb`
+       carries the two PluStore edits of STORAGE.md section 6.3. -->
   <script src="UnityLoader.js"></script>
   <script src="UnityProgress.js"></script>
 

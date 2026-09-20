@@ -8,9 +8,23 @@
   <meta name="generator" content="Construct 3">
   <link rel="stylesheet" href="style.css" type="text/css">
 
+  <!-- The save. A Construct 3 export keeps two localforage stores -
+       `c3-localstorage-<project id>` (the LocalStorage plugin, the game's own
+       keys) and `c3-savegames-<project id>` (whole-game save slots). The project
+       id here is `025bjaucvn0`. Both stores are built in scripts/c3runtime.js,
+       which is patched to build them through PluStore instead, so this has to be
+       loaded before the runtime - main.js is a module that fetches the engine
+       dynamically, so a classic script above it always wins the race. -->
   <script src="../../js/plustore.js"></script>
   <script>PluStore.configure({ game: 'soccer-random' });</script>
 
+  <!-- Nothing on this page may leave the machine. The published page loaded the
+       game, every image and every sound from an editmysite preview host by
+       absolute URL, and the SDK plugin inside c3runtime.js injected a second
+       script from a CDN. All of those are local now, but the runtime loads
+       through XMLHttpRequest and `fetch`, so both are refused here too. Same
+       origin, `data:`, `blob:` and `file:` pass; anything else is rejected once
+       per URL with a warning. -->
   <script>
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;

@@ -28,9 +28,31 @@
     }
   </style>
 
+  <!-- The save. SUPERHOT is a Unity WebGL build of the very old "compressed"
+       layout - webgl.jsgz / webgl.datagz / webgl.memgz, loaded by UnityLoader.js -
+       so its save is the player's own IDBFS tree at /idbfs, one file per
+       PlayerPrefs value, exactly as in STORAGE.md section 6. The glue is
+       webgl.jsgz and it is patched: the boot mount is a synchronous
+       PluStore.boot(FS, "/idbfs") and both flush paths go to
+       PluStore.flush(FS, "/idbfs").
+
+       This has to load before the player, because the player reads PlayerPrefs
+       as it boots. -->
   <script src="../../js/plustore.js"></script>
   <script>PluStore.configure({ game: 'super-hot', mount: '/idbfs' });</script>
 
+  <!-- Nothing on this page may leave the machine, and this player carries its own
+       telemetry: Unity 5.x compiled the analytics SDK into the player, so
+       stats.unity3d.com/HWStats.cgi, stats.unity3d.com/HWStatsUpdate.cgi,
+       api.uca.cloud.unity3d.com/v1/events and config.uca.cloud.unity3d.com are in
+       webgl.memgz and are called on the player's own schedule. Editing them out
+       means editing the compiled image, so they are refused here instead.
+
+       A refusal has to *answer*, never break: a failed UnityWebRequest can throw
+       inside managed main(), which aborts the whole runtime, and a blocked POST
+       that keeps its method fails again because a blob URL cannot be posted to.
+       So every refusal is an empty 200 - via fetch, via XHR rewritten to GET, and
+       via sendBeacon - which is what an offline machine looks like. -->
   <script>
     (function () {
       var here = location.protocol + '//' + location.host;
@@ -91,6 +113,14 @@
 <body style="margin: 0;">
   <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
 
+  <!-- The build's own entry point. `webgl.jsgz` is plain JavaScript in this copy
+       (the published page merged `webgl.jsgz.part1` and `.part2` into a blob at
+       load time; they are concatenated back into one file beside this page, so
+       the merger and its fetch/XHR shim are gone), and `UnityLoader.js` loads it,
+       the memory image and the data package itself. The published page pulled a
+       `/js/main.js` from the site root after the loader - that file is not in the
+       game folder and does not exist anywhere in this repo, and nothing needs it:
+       it defined the `UnityProgress` display the loader only calls if it exists. -->
   <script type="text/javascript">
     var Module = {
       TOTAL_MEMORY: 268435456,

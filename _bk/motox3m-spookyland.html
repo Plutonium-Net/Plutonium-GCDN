@@ -5,17 +5,31 @@
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no" />
   <link rel="stylesheet" href="assets/css/app.css" type="text/css" />
-  <title>Moto X3M</title>
+  <title>MotoX3M 6 Spooky Land</title>
 
+  <!-- The save. Same engine and the same plugin as the other Moto X3M
+       conversions - Phaser with `phaser-super-storage`, whose adapter is chosen
+       once at boot (`isLocalStorageSupport() ? LocalStorage : CookieStorage`).
+       This build's `STORAGE_KEY` is `mx3m_6_gm`, so its keys (`mx3m_6_gm` and
+       `mx3m_6_gmh`) reach the document as @file blocks under their own names.
+
+       Loaded before the game boots, because the plugin picks its adapter once. -->
   <script src="../../js/plustore.js"></script>
   <script>
-    PluStore.configure({ game: 'motox3m' });
+    PluStore.configure({ game: 'motox3m-spookyland' });
     var storage = PluStore.installWebStorage();
     if (!storage) {
-      console.error('Moto X3M: window.localStorage could not be swapped - the save ' +
-        'would go to the browser store instead of the document');
+      console.error('MotoX3M Spooky Land: window.localStorage could not be swapped ' +
+        '- the save would go to the browser store instead of the document');
     }
 
+    /* Nothing on this page may leave the machine. The published page pulled every
+       script and the game itself from a third-party preview host, loaded the
+       Google IMA ad SDK and the GameMonetize SDK from jsDelivr, and carried the
+       old js/sync.js. All of that is gone, but the game's own loader can still be
+       handed an absolute URL, and Phaser loads through both `XMLHttpRequest` and
+       `fetch`, so both are refused. Same origin, `data:` and `blob:` pass;
+       anything else is rejected once per URL with a warning. */
     (function () {
       if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
       var here = location.protocol + '//' + location.host;
@@ -33,7 +47,7 @@
       function note(url) {
         if (refused.indexOf(url) < 0) {
           refused.push(url);
-          console.warn('Moto X3M: refused a request outside this folder: ' + url);
+          console.warn('MotoX3M Spooky Land: refused a request outside this folder: ' + url);
         }
       }
 
@@ -42,49 +56,33 @@
         var url = typeof input === 'string' ? input : (input && input.url) || '';
         if (local(url)) return realFetch.apply(this, arguments);
         note(url);
-        return Promise.reject(new TypeError('Moto X3M: only this folder is reachable (' + url + ')'));
+        return Promise.reject(new TypeError('MotoX3M Spooky Land: only this folder is reachable (' + url + ')'));
       };
 
       var open = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function (method, url) {
         if (!local(url)) {
           note(url);
-          throw new TypeError('Moto X3M: only this folder is reachable (' + url + ')');
+          throw new TypeError('MotoX3M Spooky Land: only this folder is reachable (' + url + ')');
         }
         return open.apply(this, arguments);
       };
     })();
   </script>
-
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-    }
-    #content {
-      width: 100vw;
-      height: 100vh;
-    }
-    @media (min-width: 992px) {
-      body {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      #content {
-        width: 75vw;
-      }
-    }
-  </style>
 </head>
 <body>
   <div id="content"></div>
   <div id="orientation"></div>
   <div id="loader">Loading ...</div>
 
+  <!-- Every file below is the same copy the GameMonetize host served, pulled into
+       assets/lib/ beside this page; the absolute CDN URLs are gone. The Google IMA
+       ad SDK and the GameMonetize SDK were dropped - the game only listens for the
+       SDK's `SDK_GAME_START`/`SDK_GAME_PAUSE` events, so with no SDK nothing fires
+       and nothing is missed. The wrapper's `js/sync.js`, its Google Analytics tag
+       and its empty trailing `<script>` are gone. -->
   <script type="text/javascript" src="assets/lib/nape.min.js">
-    var nape = "nape.min.js";
+    var nape = "assets/lib/nape.min.js";
   </script>
   <script type="text/javascript" src="assets/lib/jquery-3.1.1.min.js"></script>
   <script type="text/javascript" src="assets/lib/easeljs-0.8.2.combined.js"></script>
@@ -93,6 +91,6 @@
   <script type="text/javascript" src="assets/lib/phaser-cachebuster.min.js"></script>
   <script type="text/javascript" src="assets/lib/phaser-super-storage.min.js"></script>
   <script type="text/javascript" src="assets/lib/dragonBones.min.js"></script>
-  <script type="text/javascript" src="min.js"></script>
+  <script type="text/javascript" src="motox3m6.min.js"></script>
 </body>
 </html>
