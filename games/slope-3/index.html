@@ -1,182 +1,118 @@
 <!DOCTYPE html>
-
-
-<!-- Pluto Game 9/11/2026 -->
-
-
-
 <html lang="en-us">
-  <head>
-<script src="../../js/sync.js"></script>
-    <base href="https://cdn.jsdelivr.net/gh/bubbls/UGS-Assets@main/slope%203/">
-     <head>
+
+<head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Slope 3</title>
 
+    <link rel="stylesheet" href="style/style.css">
 
-    <style>
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-        .webgl-content {
-            width: 100% !important;
-            height: 100% !important;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-        #gameContainer {
-            width: 100% !important;
-            height: 100% !important;
-            flex-grow: 1;
-        }
-        .footer {
-            
-            height: 5%;
-            width: 100%;
-            display: none; 
-        }
-    </style>
-
+    <!-- The save. Slope 3 is a Unity WebGL build (2019.4.24f1), so its save is
+       the player's own IDBFS tree, one file per PlayerPrefs value, and the two
+       edits that matter are in the glue beside this page (see STORAGE.md
+       section 6). This has to load before the player: it reads PlayerPrefs as it
+       boots, so PluStore must exist before UnityLoader.instantiate runs. -->
+    <script src="../../js/plustore.js"></script>
     <script>
-      window.fileMergerConfig = {
-        files: [
-          { name: 'Slope3.data.unityweb', parts: 2 } 
-        ],
-        basePath: '', 
-        debug: true
-      };
+      PluStore.configure({ game: 'slope-3' });
     </script>
 
+    <!-- Nothing on this page may leave the machine, and this player carries its
+       own telemetry (the Unity cloud endpoints baked into the wasm). A refused
+       request must be *answered*, never broken: a failed UnityWebRequest can
+       throw inside managed main(), which aborts the whole runtime, and a blocked
+       POST that keeps its method fails again because a blob URL cannot be posted
+       to. So every refusal is an empty 200 - via fetch, via XHR rewritten to GET,
+       and via sendBeacon - which is what an offline machine looks like. See
+       STORAGE.md section 6.7. -->
     <script>
-    (function() {
-      'use strict';
-      const config = Object.assign({files: [], basePath: '', debug: true}, window.fileMergerConfig || {});
-      window.mergedFiles = window.mergedFiles || {};
-      const mergeStatus = {};
+      (function () {
+        var here = location.protocol + '//' + location.host;
+        var refused = [];
+        window.pluRefused = refused;
 
-      function log(...args) { if (config.debug) console.log('[FileMerger]', ...args); }
-      function error(...args) { console.error('[FileMerger]', ...args); }
-      function normalizeUrl(url) { try { return decodeURIComponent(url.toString().split('?')[0]); } catch (e) { return url; } }
-      function urlsMatch(url1, url2) {
-        const n1 = normalizeUrl(url1), n2 = normalizeUrl(url2);
-        const name1 = n1.split('/').pop().split('?')[0];
-        const name2 = n2.split('/').pop().split('?')[0];
-
-        for (const f of config.files) {
-            if (name1.startsWith(f.name) && name1.length >= f.name.length) return f.name;
-            if (name2.startsWith(f.name) && name2.length >= f.name.length) return f.name;
-        }
-
-        return null;
-      }
-
-      async function mergeSplitFiles(filePath, partsCount) {
-        try {
-          const parts = [];
-          for (let i = 1; i <= partsCount; i++) parts.push(`${filePath}.part${i}`);
-          log(`Merging ${filePath} from ${partsCount} parts...`);
-          const responses = await Promise.all(parts.map(p => window.originalFetch(p)));
-          for (const r of responses) if (!r.ok) throw new Error(`Part missing: ${r.url} (${r.status})`);
-          const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
-          const totalLen = buffers.reduce((acc, b) => acc + b.byteLength, 0);
-          const merged = new Uint8Array(totalLen);
-          let offset = 0;
-          for (const b of buffers) { merged.set(new Uint8Array(b), offset); offset += b.byteLength; }
-          log(`✅ Merged: ${filePath} (${(totalLen/1024/1024).toFixed(2)} MB)`);
-          return merged.buffer;
-        } catch (e) { error(e); throw e; }
-      }
-
-      function shouldIntercept(url) {
-        const s = normalizeUrl(url);
-        if (s.includes('.part')) return null;
-
-        const matchedName = urlsMatch(s, s);
-        if (matchedName) return matchedName;
-        
-        return null;
-      }
-
-      function getMerged(name) {
-        if (window.mergedFiles[name]) return window.mergedFiles[name];
-        for (const [k, v] of Object.entries(window.mergedFiles)) {
-             if (k.startsWith(name)) return v;
-        }
-        return null;
-      }
-
-      if (!window.originalFetch) window.originalFetch = window.fetch;
-      window.fetch = function(url, ...args) {
-        const name = shouldIntercept(url);
-        if (name) {
-          log('Intercepting fetch:', name);
-          return new Promise((resolve, reject) => {
-            const t = setInterval(() => {
-              const b = getMerged(name);
-              if (b) {
-                clearInterval(t);
-                const type = name.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream';
-                resolve(new Response(b, {status: 200, headers: {'Content-Type': type}}));
-              }
-              else if (mergeStatus[name] === 'failed') { clearInterval(t); reject(new Error('Merge failed')); }
-            }, 50);
-          });
-        }
-        return window.originalFetch.call(this, url, ...args);
-      }
-
-      if (!window.OriginalXMLHttpRequest) window.OriginalXMLHttpRequest = window.XMLHttpRequest;
-      window.XMLHttpRequest = function(opts) {
-        const xhr = new window.OriginalXMLHttpRequest(opts);
-        const open = xhr.open;
-        xhr.open = function(m, u, ...a) { this._url = u; return open.call(this, m, u, ...a); };
-        xhr.send = function(...a) {
-          const name = shouldIntercept(this._url);
-          if (name) {
-            log('Intercepting XHR:', name);
-            const t = setInterval(() => {
-              const b = getMerged(name);
-              if (b) {
-                clearInterval(t);
-                Object.defineProperties(xhr, { status: {value: 200}, response: {value: b}, readyState: {value: 4} });
-                if (xhr.onload) xhr.onload({type: 'load', target: xhr});
-              }
-            }, 50);
-            return;
+        function allowed(url) {
+          try {
+            var u = new URL(url, here);
+            if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+            return u.protocol + '//' + u.host === here;
+          } catch (e) {
+            return false;
           }
-          return window.OriginalXMLHttpRequest.prototype.send.apply(this, a);
         }
-        return xhr;
-      }
+        function refuse(url) {
+          if (refused.indexOf(url) < 0) {
+            refused.push(url);
+            console.warn('Slope 3: refused a request outside this folder: ' + url);
+          }
+        }
 
-      async function start() {
-        config.files.forEach(f => {
-           const path = config.basePath + f.name;
-           mergeStatus[f.name] = 'merging';
-           mergeSplitFiles(path, f.parts).then(b => {
-             window.mergedFiles[f.name] = b; 
-             window.mergedFiles[path] = b;
-             mergeStatus[f.name] = 'ready';
-           }).catch(() => mergeStatus[f.name] = 'failed');
-        });
-      }
-      start();
-    })();
+        var realFetch = window.fetch;
+        window.fetch = function (input, init) {
+          var url = typeof input === 'string' ? input : (input && input.url) || '';
+          if (allowed(url)) return realFetch.apply(this, arguments);
+          refuse(url);
+          /* An answer, not a rejection: an empty body the caller can read. */
+          return Promise.resolve(new Response(new Blob([], { type: 'application/octet-stream' }), { status: 200 }));
+        };
+
+        var open = XMLHttpRequest.prototype.open;
+        var send = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function (method, url) {
+          if (allowed(url)) return open.apply(this, arguments);
+          refuse(url);
+          /* GET, not the caller's method: a blob URL is readable, not postable. */
+          this.pluBlocked = URL.createObjectURL(new Blob([], { type: 'application/octet-stream' }));
+          return open.apply(this, ['GET', this.pluBlocked].concat(Array.prototype.slice.call(arguments, 2)));
+        };
+        XMLHttpRequest.prototype.send = function () {
+          if (this.pluBlocked) return send.call(this); /* no body is forwarded */
+          return send.apply(this, arguments);
+        };
+
+        var beacon = navigator.sendBeacon && navigator.sendBeacon.bind(navigator);
+        if (beacon) {
+          navigator.sendBeacon = function (url, data) {
+            if (allowed(url)) return beacon(url, data);
+            refuse(url);
+            return true;
+          };
+        }
+      })();
+    </script>
+</head>
+
+<body>
+    <div class="webgl-content">
+        <div id="gameContainer" style="width: 100%; height: 95%; margin: auto;"></div>
+        <div class="footer">
+        </div>
+    </div>
+
+    <!-- The game's own callbacks, unchanged from the export. -->
+    <script>
+        function UnityCallJs() { console.log("unity call!"); }
+        function UnityCallPlayJs() { console.log("untiy call Play game"); }
+        function UnityCallLeaderboardJs() { console.log("untiy call On Leaderboard"); }
+        function UnityCallAgainJs() { console.log("unity call Again"); }
+        function UnityCallEndgameJs() { console.log("untiy call end game"); }
+        function UnityCallBackHomeJs() { console.log("untiy call backHome"); }
+        function UnityCallChangeDayLeaderboardJs() { console.log("untiy call change day leaderboard"); }
+        function UnityCallCloseLeaderboardJs() { console.log("untiy call close leaderboard"); }
     </script>
 
-
+    <!-- The loader and the player glue are the pinned jsDelivr copies
+       (bubbls/UGS-Assets commit 9cf4332, the `slope 3/` folder), pulled local and
+       verified by git blob hash. The split `Slope3.data.unityweb.part1/part2`
+       were merged back into one `Slope3.data.unityweb` beside this page, so the
+       page's runtime file-merger shim and its `<base href>` at jsDelivr are both
+       gone; the old `js/sync.js` is gone too. `Slope3.wasm.framework.unityweb`
+       carries the two PluStore edits of STORAGE.md section 6.3. -->
     <script src="UnityLoader.js"></script>
     <script src="UnityProgress.js"></script>
-    
+
     <script>
         var gameInstance = UnityLoader.instantiate("gameContainer", "build.json", {
             onProgress: UnityProgress,
@@ -187,51 +123,6 @@
             }
         });
     </script>
-      
-</head>
-
-<body>
-    <div class="webgl-content">
-        <div id="gameContainer" style="width: 100%; height: 95%; margin: auto;"></div>
-        <div class="footer">
-            </div>
-        
-        <script>
-            function UnityCallJs() {
-                console.log("unity call!");
-            }
-
-            function UnityCallPlayJs() {
-                console.log("untiy call Play game");
-            }
-
-            function UnityCallLeaderboardJs() {
-                console.log("untiy call On Leaderboard");
-            }
-
-            function UnityCallAgainJs() {
-                console.log("unity call Again");
-            }
-
-            function UnityCallEndgameJs() {
-                console.log("untiy call end game");
-
-            }
-
-            function UnityCallBackHomeJs() {
-                console.log("untiy call backHome");
-            }
-
-            function UnityCallChangeDayLeaderboardJs() {
-                console.log("untiy call change day leaderboard");
-            }
-
-            function UnityCallCloseLeaderboardJs() {
-                console.log("untiy call close leaderboard");
-            }
-        </script>
-
-    </div>
 </body>
 
 </html>

@@ -125,7 +125,7 @@ exists today:
 
 | Engine | Adapter | Status |
 |---|---|---|
-| Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use |
+| Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use — see [`games/slope-3/`](games/slope-3/) and [section 6](#6-unity-webgl) |
 | Godot 4 HTML5 | the same two hooks, plus `is_persistent` answered from PluStore | implemented, in use |
 | GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
@@ -211,8 +211,8 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — twenty-seven games are on PluStore
-   so far, and 6 of the 34 in this repo still load that bridge as a script tag
+   `<script src="../../js/sync.js"></script>` — twenty-eight games are on PluStore
+   so far, and 5 of the 34 in this repo still load that bridge as a script tag
    (`tiny-fishing` loads neither, so it saves nothing at all yet). Count script
    tags, not mentions: a converted page may still say `js/sync.js` in a comment
    explaining what it replaced.
@@ -564,6 +564,65 @@ What to look at: `document.getElementById('plu-startup-error')` must stay
 absent, every blocked request must log status **200**, and nothing may log `0`.
 Cluster Rush and the other converted pages in [section 11](#11-web-storage-localstorage)
 use the same guard, so the rule is theirs too.
+
+### 6.8 What the Slope 3 conversion added
+
+Slope 3 is a Unity 2019.4.24f1 WebGL build, and its conversion is the plain recipe
+of [section 6.3](#63-cut-the-indexeddb-persistence) — but it is the first in this
+catalogue whose data file was **shipped split**, and the first whose save turns out
+to depend on the *port* the page is served from.
+
+**The split data file, merged instead of shimmed.** The source folder ships
+`Slope3.data.unityweb.part1` (19.9 MB) and `.part2` (8.6 MB), and the published page
+carried a runtime file-merger — a `fetch`/`XMLHttpRequest` wrapper that fetched the
+parts, concatenated them and answered the player's request for
+`Slope3.data.unityweb` with the merged blob. Pulling the two parts local and
+concatenating them once (28,526,058 bytes) removes the whole shim, so the page is
+just the loader, the glue and the game.
+
+**The two edits.** The glue is plain JS (Unity 2019), the 2019 layout of
+[section 6.2](#62-find-the-patch-points-in-the-build): the boot `preRun` step loses
+`FS.mount(IDBFS, …)` and its `FS.syncfs(true, …)` for a synchronous
+`PluStore.boot(FS, "/idbfs")`, and the shared `fs.sync` helper plus the two
+`if(!Module.indexedDB) return;` gates are replaced so both the periodic tick and
+`_JS_FileSystem_Sync` reach `PluStore.flush(FS, "/idbfs")`. There is no site 3 —
+this build has no save import of its own, and the one `FS.syncfs` left in the file
+is Emscripten's own implementation, now unreachable. The page's `js/sync.js`, its
+`<base href>` at jsDelivr and the merger are gone; the answering guard of
+[section 6.7](#67-refuse-a-request-and-answer-it) is in their place.
+
+**The save is one PlayerPrefs file.** `SETTING_DATA` holds the game's whole save as
+one string — `{"sound":true,"currentName":…,"bestScore":{"playerName":…,"best":…}}`
+— beside the `header` line, under the player's own MD5 directory.
+
+**Both paths proven, and a caveat found.** Within one origin the round trip is the
+usual one: the player wrote the document from having played, and a seeded document
+(`best:42`, a marker name) came back with **both seeded values intact** after the
+next boot's flush — a value the player could only have got from the document.
+Boot is **0 off-machine requests, 0 exceptions**, and no request is even refused,
+because on a local origin the player's cloud endpoints are simply never reached.
+
+The caveat is this: **the player's MD5 directory is a function of the page's
+origin, port included,** and the document records the path the player created. So
+the save round-trips on the origin that made it, but a *different* port is a
+different directory. Measured four ways and then pinned down:
+
+- 8440 → `72b1383da710a45ce89568c851be1443`; 8455 → `3fa5fe3664b09210104f3a14bc36772b`;
+  8460 → `6b39843006b2fc855d3bd4e9a3c85d1a`; 8470 → `e3bf01f46842ac0e6329eeb2d366cc1b`;
+- the same port twice, in two fresh browser profiles, produced the *same*
+directory `8f6f0b98eada4fb8d6b24834ee570eb4` — so it is deterministic, not random;
+- seeding a save made on 8460 into a page served on 8470 left it **unread**: the
+player created its own `e3bf01…` directory, wrote its own fresh prefs there, and
+the document ended up holding *both* directories — the seeded one intact but
+ignored, and the player's new one.
+
+So nothing is lost, but a save made on one port is not found on another: the same
+class of problem as Ruffle's host-shaped keys
+([section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)), and it
+applies to **every** Unity conversion here, not just this one. A fixed port (this
+catalogue's pages are served on 5500) never sees it, and that is why the earlier
+conversions verified clean. An inspector that lists `@dir` blocks will show a stale
+one after a port change, which is the visible sign.
 
 ---
 
