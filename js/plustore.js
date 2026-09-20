@@ -844,7 +844,8 @@
      bytes: a host that decides whether to store a save by diffing it should
      not see it "change" for free. */
   function writeView(v) {
-    var stored = parse(cfg.backend.read() || '');
+    var previous = cfg.backend.read() || '';
+    var stored = parse(previous);
     var tree = stored || { dirs: [], files: [] };
     var files = [];
     var i, names;
@@ -868,12 +869,24 @@
     }
 
     var doc = serialize({ dirs: tree.dirs, files: files }, new Date().toISOString());
+    /* Nothing changed but the timestamp, so the backend keeps the earlier
+       document — and its earlier timestamp — and the shell hears nothing. */
+    if (canonical(doc) === canonical(previous)) return;
     cfg.backend.write(doc);
     viewCache = v;
     viewCacheDoc = doc;
     lastDoc = doc;
     stats.savedAt = new Date().toISOString();
     emit(doc);
+  }
+
+  /* A document's `#saved` line is a timestamp, not part of the save: two
+     documents differing only there are the same save written twice. Both
+     dedupes below compare with that line blanked, so a game that writes the
+     same value over and over neither rewrites the backend nor pushes a stream
+     of identical documents at the shell. */
+  function canonical(doc) {
+    return String(doc || '').replace(/^#saved .*$/m, '#saved');
   }
 
   function byKey(a, b) {
@@ -1022,15 +1035,30 @@
     if (global.console && console.warn) console.warn('[PluStore] ' + msg);
   }
 
+  /* The framed page cannot reach the network, so the shell that frames it
+     carries the document to and from the cloud. Plain text both ways:
+
+        game  -> shell   { plu: true, type: 'plu_text_ready' }
+                         { plu: true, type: 'plu_text_data', doc, stats }
+        shell -> game    { plu: true, type: 'plu_text_restore', doc }
+                         { plu: true, type: 'plu_text_request' }
+
+     'ready' goes out while this file loads — before any player script — so a
+     shell that answers at once lands the document ahead of boot, which is the
+     only moment a restored save can be handed over. */
+  function postToHost(message) {
+    try {
+      if (global.parent && global.parent !== global) {
+        global.parent.postMessage(message, '*');
+      }
+    } catch (e) {}
+  }
+
   function emit(doc) {
     for (var i = 0; i < listeners.length; i++) {
       try { listeners[i](doc); } catch (e) {}
     }
-    try {
-      if (global.parent && global.parent !== global) {
-        global.parent.postMessage({ pluTextStore: true, game: cfg.game, doc: doc, stats: stats }, '*');
-      }
-    } catch (e) {}
+    postToHost({ plu: true, type: 'plu_text_data', game: cfg.game, doc: doc, stats: stats });
   }
 
   var PluStore = {
@@ -1485,6 +1513,8 @@
        values it read. Synchronous, so it needs no run dependency. */
     boot: function (FS, mount) {
       stats.booted++;
+      liveFS = FS || liveFS;
+      liveMount = mount || liveMount;
       try {
         if (FS && mount) { try { FS.mkdir(mount); } catch (e) {} }
         var doc = cfg.backend.read();
@@ -1502,6 +1532,8 @@
        player asks for, and on its periodic sync tick. Writing only happens
        when something actually changed. */
     flush: function (FS, mount) {
+      liveFS = FS || liveFS;
+      liveMount = mount || liveMount;
       try {
         var mountPoint = mount || cfg.mount;
         var tree = readTree(FS, mountPoint);
@@ -1514,7 +1546,7 @@
         tree.files = tree.files.concat(hosted);
         var doc = serialize(tree, new Date().toISOString());
         stats.flushed++;
-        if (doc === lastDoc) return;
+        if (canonical(doc) === canonical(lastDoc)) return;
         lastDoc = doc;
         stats.savedAt = new Date().toISOString();
         cfg.backend.write(doc);
@@ -1569,6 +1601,80 @@
     backends: { localStorage: localStorageBackend, memory: memoryBackend }
   };
 
+  /* ── Host bridge — cloud sync ─────────────────────────────────────────── */
+
+  var RELOAD_KEY = 'plu_text_reloads';
+  var MAX_RELOADS = 3; // loop-breaker; not expected to be reached
+  var liveFS = null;   // the player's filesystem, kept for an on-demand flush
+  var liveMount = null;
+
+  /* The `#saved` line every document carries, in milliseconds. */
+  function savedAtOf(doc) {
+    var m = /^#saved (.+)$/m.exec(doc || '');
+    var t = m ? Date.parse(m[1]) : NaN;
+    return isNaN(t) ? null : t;
+  }
+
+  function reloadOnce() {
+    var reloads = 0;
+    try { reloads = parseInt(global.sessionStorage.getItem(RELOAD_KEY), 10) || 0; } catch (e) {}
+    if (reloads >= MAX_RELOADS) return;
+    try { global.sessionStorage.setItem(RELOAD_KEY, String(reloads + 1)); } catch (e) {}
+    try { global.location.reload(); } catch (e) {}
+  }
+
+  /* A document the shell hands over replaces the stored one. If the player has
+     not booted yet it seeds from it; if it already booted it read the old
+     document into memory, and the only honest way to hand it another is a
+     reload — the same bounded reload the old bridge used.
+
+     A document older than the one already stored is refused: a save the player
+     kept locally is never rolled back to an earlier cloud copy merely because
+     the shell fetched one. */
+  function adopt(doc) {
+    if (typeof doc !== 'string' || !doc) return false;
+    var stored = cfg.backend.read() || '';
+    if (doc === stored) return false;
+    if (!parse(doc)) { warn('host document did not parse; ignored'); return false; }
+
+    var incoming = savedAtOf(doc);
+    var mine = savedAtOf(stored);
+    if (incoming !== null && mine !== null && incoming <= mine) return false;
+
+    cfg.backend.write(doc);
+    lastDoc = doc;
+    viewCache = null;
+    viewCacheDoc = null;
+    stats.savedAt = new Date().toISOString();
+    emit(doc);
+    if (stats.booted > 0) reloadOnce();
+    return true;
+  }
+
+  /* Answer a snapshot request with the document as it stands. A player that
+     holds its working copy in memory until it flushes is flushed first, so the
+     answer is never one save behind. */
+  function snapshot() {
+    if (liveFS && liveMount) {
+      try { PluStore.flush(liveFS, liveMount); } catch (e) {}
+    }
+    emit(PluStore.get());
+  }
+
+  function onHostMessage(e) {
+    var d = e && e.data;
+    if (!d || d.plu !== true) return;
+    if (global.parent && global.parent !== global && e.source !== global.parent) return;
+    if (d.type === 'plu_text_restore') adopt(d.doc);
+    else if (d.type === 'plu_text_request') snapshot();
+  }
+
+  try { global.addEventListener('message', onHostMessage); } catch (e) {}
+
   PluStore.configure({});
   global.PluStore = PluStore;
+  /* The page has not configured its game yet at this point — this runs while
+     plustore.js loads — so the message carries no name; the shell framed this
+     page and already knows which game it is. */
+  postToHost({ plu: true, type: 'plu_text_ready' });
 })(window);

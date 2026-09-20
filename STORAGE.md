@@ -215,11 +215,11 @@ result is a save that looks fine and silently loses data. Remove all of it.
    repo are on PluStore now, and **no page loads that bridge any more**
    (`ultrakill` was the last, [section 6.10](#610-what-the-ultrakill-conversion-added);
    `soccer-random` is a build with no save to route in the first
-   place — [section 8.9](#89-a-build-with-no-save-at-all)). Sixteen pages still
-   *mention* the file in a comment explaining what it replaced — count script
-   tags, not mentions.
-   The same applies to a **host SDK** the wrapper pulled off a CDN, which is the
-   second storage plane some builds have — [section 15](#15-yandex-games).
+   place — [section 8.9](#89-a-build-with-no-save-at-all)). The file itself is
+   gone from this repo: `js/` holds `plustore.js` and nothing else, and no page
+   mentions the bridge even in a comment. The same applies to a **host SDK** the
+   wrapper pulled off a CDN, which is the second storage plane some builds
+   have — [section 15](#15-yandex-games).
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
    mount — [section 6.3](#63-cut-the-indexeddb-persistence). Whatever the old
    path was, the game must stop writing there.
@@ -227,9 +227,9 @@ result is a save that looks fine and silently loses data. Remove all of it.
    browser still holds it, it is inert, and if the new path turns out wrong the
    old save is still on disk to fall back on.
 4. **Check `details.json`.** A truthy `cloudSync` for that game depended on the
-   old bridge. `snow-rider-3d` is `false`, so nothing was lost — but a game set
-   to `true` loses that capability unless the host is adapted to the text
-   document.
+   old bridge. `snow-rider-3d` is `false`, so nothing was lost — and a game set
+   to `true` keeps the capability without any per-game work, because the shell
+   now syncs the text document itself ([section 18.1](#181-cloud-sync-the-framed-shell)).
 5. **Verify nothing else still writes.** Open the game, play, and confirm the
    old store stops changing. For Unity that is the `indexedDB /idbfs` record
    count in [section 16](#16-verifying-a-conversion).
@@ -4076,6 +4076,55 @@ for tests and for a save that should die with the tab). Point it at a file, a
 host API, or a remote endpoint by writing your own — nothing else in the engine
 needs to change.
 
+A game page, however, is served from the CDN and is allowed to reach exactly one
+host: itself. The remote backend is therefore not in the page at all, but in the
+shell that frames it — [section 18.1](#181-cloud-sync-the-framed-shell).
+
+### 18.1 Cloud sync: the framed shell
+
+`js/plustore.js` installs the bridge itself, at load, framed or not. A game page
+does nothing to get it. When the page has a parent, the document travels to it as
+plain text and comes back the same way:
+
+```
+game  → shell   { plu: true, type: 'plu_text_ready' }
+                { plu: true, type: 'plu_text_data', doc, stats }
+shell → game    { plu: true, type: 'plu_text_restore', doc }
+                { plu: true, type: 'plu_text_request' }
+```
+
+- **`plu_text_ready`** goes out while `plustore.js` loads — before any player
+  script, and with no game name on it, because the page has not called
+  `configure()` yet. It is the signal a shell waits for before handing over a
+  save, and the reason a restore lands *ahead of boot*: `boot()` seeds the mount
+  from the document, so the document has to be there before the player asks.
+- **`plu_text_data`** is the whole document, on every change — the same string
+  `get()` returns. `stats()` rides along for diagnostics. A rewrite that says the
+  same thing is not a change: both `flush()` and the hosted-view writer compare
+  the document with its `#saved` line blanked, so a build that touches the same
+  value in a loop does not push a stream of identical copies at the shell.
+- **`plu_text_request`** asks for one, and the answer is always the current
+  document — a player that holds its working copy in memory until it flushes
+  (Unity, Godot) is flushed first, so the answer is never one save behind.
+  This is what a shell sends when the frame is about to go away.
+- **`plu_text_restore`** replaces the stored document. Three things make it
+  safe:
+  - a document older than the one already stored is **refused**, so a cloud copy
+    never rolls back newer local progress;
+  - a document that does not parse is **ignored** rather than written;
+  - if the player has **already booted**, the page reloads to reseed — the same
+    bounded reload (`sessionStorage`, three at most) the old bridge used, and
+    the only honest way to hand a running player a different save.
+
+On the shell's side one game is one record: `game_saves/<game id>`, holding
+`{doc, updatedAt}` — the document as text, and nothing else. There is no key
+list, no IndexedDB blob, and no per-engine translation, which is exactly what
+makes the same code work for a Unity mount, a GameMaker file map and a Flash
+SharedObject. The list of games that have a record lives with the account's own
+document (`games_data/saved`, under `savedGames`), and a document with no blocks
+in it is never uploaded, so a build that has not saved anything yet cannot
+erase a save that is already in the cloud.
+
 ---
 
 ## 19. Reference
@@ -4252,6 +4301,24 @@ is what makes a re-encode safe to hand back.
   zero IndexedDB.
 - **Nothing is migrated.** A game converted from the old bridge starts from a
   clean save unless you import it by hand.
+- **Cloud sync is last-writer-wins, with one guard.** Two devices playing the
+  same game offline both produce a save; whichever reaches the cloud last is the
+  one the other device adopts. The only defence is the `#saved` line, which stops
+  a decision that would move a session *backwards* — an older cloud document is
+  refused, and the newer local one is uploaded instead
+  ([section 18.1](#181-cloud-sync-the-framed-shell)). Concurrent play on two
+  devices is not reconciled.
+- **A restore that arrives late costs a reload.** A shell that answers
+  `plu_text_ready` promptly hands the save over before boot and the player never
+  notices. Answer after the player has read the filesystem and the page has to
+  reload once to reseed, which is visible as a flash of the loading screen. The
+  reload is bounded per tab ([section 18.1](#181-cloud-sync-the-framed-shell)), so
+  a shell that re-pushes the same save on every launch cannot loop a page.
+- **The sync boundary is the frame, not the game.** The shell files every
+  document under the game it framed and ignores the `#game` line inside it, and
+  it accepts messages only from that frame. A page opened directly in a tab has
+  no parent, so it saves locally and syncs nowhere — which is also the state
+  every game is in before the shell is applied.
 - **Godot saves when it feels like it.** The engine calls for a sync when it
   closes or renames a file, so a clean install writes nothing until the game
   saves something of its own — and a game whose only `user://` traffic is the
@@ -4355,4 +4422,4 @@ is what makes a re-encode safe to hand back.
 
 ---
 
-*Pluto GCDN — 9/16/2026*
+*Pluto GCDN — 9/20/2026*
