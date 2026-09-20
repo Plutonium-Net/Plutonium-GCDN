@@ -222,12 +222,5 @@
     "banner": "images/tiny-fishing.png",
     "cloudSync": true,
     "tags": []
-  },
-  "ultrakill": {
-    "description": "A fast retro-styled shooter built around aggressive movement, stylish attacks, and constant momentum. Chain weapons and movement tricks to survive arenas at breakneck speed.",
-    "controls": [],
-    "banner": "images/ultrakill.png",
-    "cloudSync": true,
-    "tags": []
   }
 }

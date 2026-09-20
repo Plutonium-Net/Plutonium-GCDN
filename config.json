@@ -196,12 +196,6 @@
       "name": "Tiny Fishing",
       "path": "games/tiny-fishing/index.html",
       "image": "images/tiny-fishing.png"
-    },
-    {
-      "id": "ultrakill",
-      "name": "Ultrakill",
-      "path": "games/ultrakill/index.html",
-      "image": "images/ultrakill.png"
     }
   ]
 }
