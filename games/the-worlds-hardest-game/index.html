@@ -1,18 +1,10 @@
-<Module>
-
-
-<!-- Pluto Game 9/11/2026 -->
-
-
-
-<Module>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="../../js/sync.js"></script>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>really cool flash game</title>
+  <title>The World's Hardest Game</title>
   <style>
     html, body {
       margin: 0;
@@ -35,30 +27,10 @@
       background: black;
       z-index: 10;
     }
-    #box-top {
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 0;
-    }
-    #box-bottom {
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 0;
-    }
-    #box-left {
-      top: 0;
-      left: 0;
-      width: 0;
-      height: 100%;
-    }
-    #box-right {
-      top: 0;
-      right: 0;
-      width: 0;
-      height: 100%;
-    }
+    #box-top    { top: 0;    left: 0;  width: 100%; height: 0; }
+    #box-bottom { bottom: 0; left: 0;  width: 100%; height: 0; }
+    #box-left   { top: 0;    left: 0;  width: 0;    height: 100%; }
+    #box-right  { top: 0;    right: 0; width: 0;    height: 100%; }
     ruffle-player {
       width: 100%;
       height: 100%;
@@ -66,8 +38,82 @@
       display: block;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle@0.2.0-nightly.2025.10.2/ruffle.min.js"></script>
-  
+
+  <!-- The save. This is a Flash build - one SWF, played by Ruffle - so any save it
+       kept would be a SharedObject, and Ruffle keeps SharedObjects in
+       localStorage. Swapping the area before Ruffle initialises is the whole
+       conversion (STORAGE.md sections 11 and 14).
+
+       installSharedObjects is the Ruffle-shaped version of that swap: Ruffle names
+       a slot after the movie's own URL - "<host>/games/the-worlds-hardest-game/
+       wordes-hardest-gae.swf/<name>" - so the host the page was opened from would
+       otherwise be part of the save's name. Naming the movie narrows that to
+       "wordes-hardest-gae.swf/<name>".
+
+       This movie turns out to keep nothing locally: it contains no SharedObject at
+       all (no "SharedObject", "getLocal" or "flush" string anywhere in its constant
+       pool), only an online high-score submit. The swap is still the right
+       install - it is what keeps the movie off this machine's browser store
+       whether or not it ever asks - and section 14.15 records how that was proved.
+
+       This has to come before `ruffle.min.js`, because the player reads a movie's
+       save as it loads it. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    PluStore.configure({ game: 'the-worlds-hardest-game' });
+    var storage = PluStore.installSharedObjects('wordes-hardest-gae.swf');
+    if (!storage) {
+      console.error('The World\'s Hardest Game: window.localStorage could not be swapped - ' +
+        'the save would go to the browser store instead of the document');
+    }
+
+    /* The movie carries one outbound request: a LoadVars POST of the player's name
+       and score to snubbyland.com/highscores_theWorldsHardestGame.php, fired when a
+       run ends. The other five URLs in it are getURL link buttons on the menu
+       (armorgames, newgrounds, flashkit), which only act if the player clicks
+       them. There is nothing here that needs the network, so the POST is refused
+       and answered - the movie sees the failure its own code already handles.
+       Ruffle fetches through `window.fetch` and never through XMLHttpRequest, so
+       that one call is the whole surface. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
+
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        if (refused.indexOf(url) < 0) {
+          refused.push(url);
+          console.warn('The World\'s Hardest Game: refused a request outside this folder: ' + url);
+        }
+        return Promise.reject(new TypeError('The World\'s Hardest Game: only this folder is reachable (' + url + ')'));
+      };
+    })();
+  </script>
+
+  <!-- Ruffle, vendored from the release the other Flash pages use
+       (@ruffle-rs/ruffle 0.2.0-nightly.2025.10.2, MIT / Apache-2.0, both licences
+       beside it) with the core glue and the wasm it fetches from this folder at run
+       time. The published page took ruffle.min.js from jsDelivr and carried the
+       save off through js/sync.js; neither is here any more.
+
+       Both core pairs are kept, and both are needed: ruffle.min.js probes
+       WebAssembly.validate() for SIMD and four other extensions, and loads
+       core.ruffle.ae105... + f7f28e....wasm when all five are present, falling back
+       to core.ruffle.9085... + 4d8824....wasm otherwise. -->
+  <script src="ruffle/ruffle.min.js"></script>
 </head>
 <body>
   <div id="flash-container"></div>
@@ -76,56 +122,59 @@
   <div class="black-box" id="box-left"></div>
   <div class="black-box" id="box-right"></div>
   <script>
-    const container = document.getElementById("flash-container");
-    const boxTop = document.getElementById("box-top");
-    const boxBottom = document.getElementById("box-bottom");
-    const boxLeft = document.getElementById("box-left");
-    const boxRight = document.getElementById("box-right");
-    
+    const container = document.getElementById('flash-container');
+    const boxTop = document.getElementById('box-top');
+    const boxBottom = document.getElementById('box-bottom');
+    const boxLeft = document.getElementById('box-left');
+    const boxRight = document.getElementById('box-right');
+
+    /* The movie's own stage, read out of the SWF header: 550x400, so 11/8. The
+       published page used the wrapper's 5.5/3 and stretched it. */
+    const aspectRatio = 550 / 400;
+
     function resizeGame() {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
-      const aspectRatio = 5.5 / 3;
-      
+
       let width = Math.floor(windowWidth * 1);
       let height = Math.floor(width / aspectRatio);
-      
+
       if (height > windowHeight * 1) {
         height = Math.floor(windowHeight * 1);
         width = Math.floor(height * aspectRatio);
       }
-      
+
       container.style.width = `${width}px`;
       container.style.height = `${height}px`;
-      
+
       const topMargin = (windowHeight - height) / 2;
       const leftMargin = (windowWidth - width) / 2;
-      
+
       boxTop.style.height = `${topMargin}px`;
       boxBottom.style.height = `${topMargin}px`;
       boxLeft.style.width = `${leftMargin}px`;
       boxRight.style.width = `${leftMargin}px`;
     }
-    
-    window.addEventListener("resize", resizeGame);
-    window.addEventListener("DOMContentLoaded", () => {
+
+    window.addEventListener('resize', resizeGame);
+    window.addEventListener('DOMContentLoaded', () => {
       resizeGame();
       const ruffle = window.RufflePlayer?.newest() || window.RufflePlayer?.createPlayer();
       if (ruffle && container) {
         const player = ruffle.createPlayer();
-        player.style.width = "100%";
-        player.style.height = "100%";
-        player.style.background = "black";
+        player.style.width = '100%';
+        player.style.height = '100%';
+        player.style.background = 'black';
         container.appendChild(player);
-        player.load("$1");
+        /* The published page called player.load("$1"). Its wrapper was never
+           filled in, so Ruffle was handed a four-character string where a movie
+           belongs and nothing ever started - the inert <param>/<embed> pair below
+           it pointed at the CDN instead. */
+        player.load('wordes-hardest-gae.swf');
       } else {
-        container.textContent = "Ruffle failed to load."; 
+        container.textContent = 'Ruffle failed to load.';
       }
     });
   </script>
-    <param name="movie" value="https://cdn.jsdelivr.net/gh/sonvallhall/x7x@51cffb21c08c2ca9cecbed7aecf10d1afb8b9c72/wordes-hardest-gae.swf">
-    <embed src="https://cdn.jsdelivr.net/gh/sonvallhall/x7x@51cffb21c08c2ca9cecbed7aecf10d1afb8b9c72/wordes-hardest-gae.swf" width="100%" height="100%">
 </body>
 </html>
-</Content>
-</Module>

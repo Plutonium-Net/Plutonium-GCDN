@@ -127,13 +127,13 @@ exists today:
 |---|---|---|
 | Unity WebGL | `PluStore.boot(FS, mount)` + `PluStore.flush(FS, mount)` | implemented, in use — see [`games/slope-3/`](games/slope-3/) and [section 6](#6-unity-webgl) |
 | Godot 4 HTML5 | the same two hooks, plus `is_persistent` answered from PluStore | implemented, in use |
-| GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` | implemented, in use |
+| GameMaker HTML5 (flat named files) | `PluStore.files.read/exists/has/write/ensure/remove` — and, for a build whose real save is cookies rather than files, `PluStore.webStorage()` for the jar — see [`games/tiny-fishing/`](games/tiny-fishing/) and [section 7.6](#76-what-the-tiny-fishing-conversion-added) | implemented, in use |
 | Construct 3 HTML5 (localforage key/value stores) | `PluStore.stores.instance(name)`, `stores.names()`, `stores.entries(name)` | implemented, in use |
 | Construct 2 HTML5 (one localforage global, callback API) | `PluStore.stores.localforage(name)` | implemented, in use |
 | Web Storage engines (`localStorage`) | `PluStore.installWebStorage()` — swaps the area, nothing else changes | implemented, in use — see the five Phaser `phaser-super-storage` builds [`games/motox3m/`](games/motox3m/), [`games/motox3m-2/`](games/motox3m-2/), [`games/motox3m-3/`](games/motox3m-3/), [`games/motox3m-spookyland/`](games/motox3m-spookyland/), [`games/motox3m-winter/`](games/motox3m-winter/) and [section 11](#11-web-storage-localstorage) |
 | Web Storage engines that save by property (`localStorage[k] = v`) | the same area; the proxy behind `installWebStorage()` answers by property too | implemented, in use |
 | YouTube Playables (`ytgame.game.loadData` / `saveData`) | a local stand-in for the SDK, over the Web Storage area — see [`games/crossy-road/ytgame-local.js`](games/crossy-road/ytgame-local.js) | implemented, in use |
-| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" (or, when the movie names no movie in the key, the host dropped so the rest is fixed text) | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/), [`games/learn-to-fly-3/`](games/learn-to-fly-3/) and [section 14](#14-flash-ruffle) |
+| Flash (Ruffle SharedObjects) | `PluStore.installSharedObjects('<movie>.swf')` — the same area, with Ruffle's host-shaped keys narrowed to "<movie>/<name>" (or, when the movie names no movie in the key, the host dropped so the rest is fixed text) | implemented, in use — see [`games/duck-life/`](games/duck-life/), [`games/duck-life-2/`](games/duck-life-2/), [`games/learn-to-fly/`](games/learn-to-fly/), [`games/learn-to-fly-2/`](games/learn-to-fly-2/), [`games/learn-to-fly-3/`](games/learn-to-fly-3/), [`games/the-binding-of-isaac/`](games/the-binding-of-isaac/), [`games/the-worlds-hardest-game/`](games/the-worlds-hardest-game/) and [section 14](#14-flash-ruffle) |
 | Fancade (Poki) player | the same two hooks over the player's `/sandbox` mount, *and* `installWebStorage()` for the `localStorage` half of the same save — see `games/drive-mad/` and [section 13](#13-fancade-poki) | implemented, in use |
 
 A new adapter needs exactly two functions: one that reads the engine's save and
@@ -211,13 +211,13 @@ The old method and PluStore cannot coexist: whichever writes last wins, and the
 result is a save that looks fine and silently loses data. Remove all of it.
 
 1. **Delete the old bridge script tag.** Every converted game dropped
-   `<script src="../../js/sync.js"></script>` — thirty games are on PluStore
-   so far, and 3 of the 34 in this repo still load that bridge as a script tag
-   (`tiny-fishing` loads neither, so it saves nothing at all yet, and
-   `soccer-random` is a build with no save to route in the first place —
-   [section 8.9](#89-a-build-with-no-save-at-all)). Count script
-   tags, not mentions: a converted page may still say `js/sync.js` in a comment
-   explaining what it replaced.
+   `<script src="../../js/sync.js"></script>` — all **thirty-four** games in this
+   repo are on PluStore now, and **no page loads that bridge any more**
+   (`ultrakill` was the last, [section 6.10](#610-what-the-ultrakill-conversion-added);
+   `soccer-random` is a build with no save to route in the first
+   place — [section 8.9](#89-a-build-with-no-save-at-all)). Sixteen pages still
+   *mention* the file in a comment explaining what it replaced — count script
+   tags, not mentions.
    The same applies to a **host SDK** the wrapper pulled off a CDN, which is the
    second storage plane some builds have — [section 15](#15-yandex-games).
 2. **Delete the engine's own persistence path.** For Unity that is the IDBFS
@@ -710,6 +710,108 @@ document's own slot is per-origin, because it is `localStorage`. A short run
 reaches no game-owned key at all: the player's bookkeeping is the entire
 `PlayerPrefs` file even after playing into a level.
 
+### 6.10 What the ULTRAKILL conversion added
+
+ULTRAKILL is a Unity **2021.3.45f1** WebGL build in the modern
+`createUnityInstance` layout, and it is the conversion that made the library grow
+an option: this build carries **Unity Analytics**, and Analytics writes into the
+same filesystem as the save.
+
+**The page was a wrapper around a folder that is dead twice over.** It loaded
+`js/sync.js`, took the whole build from
+`<base href="https://cdn.jsdelivr.net/gh/genizy/web-port@master/ultrakill/">`, and
+was titled `Unity WebGL Player | ULTRAKILL`. That URL resolves to nothing today:
+the repository renamed its branch, and jsDelivr answers **403 for the whole user**
+("User genizy is blocked"). The pull pinned commit
+`a8bea5fd11f88e5a9192857f434e299c40efe7e6` on `main`, took the bytes from
+`raw.githubusercontent.com`, and checked **every file against the tree's own git
+blob sha** — each part before merging, and every file on disk afterwards. The
+framework is the one file that no longer matches, because it is the file that was
+patched ([section 6.3](#63-cut-the-indexeddb-persistence)). Folder: **12 files,
+98 MB**.
+`TemplateData/` came along and stays unreferenced — the page has its own styles.
+
+**The build ships split, and neither part keeps the promise its name makes.**
+`Build/ultrakill.data.unityweb` (73,236,965 bytes) arrived as four parts and
+`Build/ultrakill.wasm.unityweb` (24,370,088 bytes) as two, concatenated into one
+file each, which deletes the page's runtime part-merger and its blob URLs. The
+data file is a `UnityWebData1.0` bundle (`55 6e 69 74 79 57 65 62` —
+`UnityWeb`); the wasm is **already decompressed**, `00 61 73 6d` = `\0asm`, the raw
+module rather than the gzip the extension once meant
+([section 6.9](#69-what-the-superhot-conversion-added)). The framework
+(`Build/ultrakill.framework.js.unityweb`, 401,682 bytes) is plain JavaScript text
+opening `function unityFramework(Module) {`, so ordinary string replacement
+patches it.
+
+**This layout moves three sites, and there is no game-side write call at all.**
+The player wraps IndexedDB itself with its own
+`injectIndexedDBToAutomaticallyPersist()`, so the mount *is* the persistence and
+nobody calls a save function:
+
+| Site in the framework | What it becomes |
+|---|---|
+| the `preRun` step that mounts, `FS.mount(IDBFS, {}, "/idbfs")` | `PluStore.boot(FS, "/idbfs")` — the seed, before the player opens the directory |
+| the periodic tick the auto-persist helper installs | `PluStore.flush(FS, "/idbfs")` |
+| `_JS_FileSystem_Sync` | `PluStore.flush(FS, "/idbfs")` |
+
+`IDBFS` stays behind as dead code — 34 mentions of the name, 6 `FS.syncfs` calls,
+all of them unreachable — the same shape as
+[section 6.6](#66-the-asmjs-era-layout). The PlayerPrefs path carries an MD5
+directory again (`/idbfs/a22b6695d175411d25c391b2b1a7dbbf/PlayerPrefs`), so the
+port caveat of [section 6.8](#68-what-the-slope-3-conversion-added) applies.
+
+**The save is the game's settings, and the game rewrites them wholesale.**
+`PluStore.list()` on a clean boot shows one `@unity-prefs` block holding
+`BlStCh`, `ColCom`, `FullIntro`, `MaVo`, `MuVo`, `Pix`, `SiEnDi` and `VerWar`
+beside Unity's own `unity.cloud_userid` and `unity.player_session_count` — no game
+file at all, because this build only writes a level save once a run is finished.
+The same caveat as Granny applies to seeding one of those settings by hand: a
+value written into the document for a key the game owns is overwritten by the
+game's own write at the next boot, so it proves nothing
+([section 20](#20-known-limits)). What a round trip is proven with here is the
+game's own counter and a key it has never heard of — see below.
+
+**Its telemetry reaches the save, not just the network.** Two Unity Analytics
+endpoints are refused by the guard of
+[section 6.7](#67-refuse-a-request-and-answer-it) —
+`https://config.uca.cloud.unity3d.com` and
+`https://cdp.cloud.unity3d.com/v1/events`, twice per boot — and that is the half
+the guard can see. The other half is on disk: every event the service queues is
+written **into the player's own filesystem**, as
+`/idbfs/<hash>/Unity/<project id>/Analytics/ArchivedEvents/<event>.<hash>/{s,g,c,e}`
+— four or five small files per event, each carrying `appid`, `userid`,
+`sessionid`, `platform`, `sdk_ver`, `localprojectid`, `build_guid` and an
+`identity_token`. A persistent identity, in the save, for an endpoint that cannot
+answer: the document grew ~3.4 KB per boot because of it — **8,551 chars in 23
+blocks after one boot, 11,990 after two, 19 of those blocks telemetry**.
+
+**So `configure` gained `skip`.** A list of paths the document never keeps: a
+string is a prefix, a regular expression is a pattern, and a match drops the whole
+subtree below it. The default is empty, so no other page in the catalogue changes
+behaviour. ULTRAKILL's page passes
+`/\/Unity\/[0-9a-f-]{36}\/Analytics(\/|$)/`, and the same two boots now hold
+**587 and 626 chars in 4 blocks** — the PlayerPrefs, the directories above it and
+nothing else. The events still queue inside the running player; they simply never
+reach the save. A page opts out per path on purpose, because "the engine wrote a
+file" is normally the whole definition of the save.
+
+**Both directions, with the game's own numbers as the proof.** On a clean profile
+the document is written *by the player* (`unity.player_session_count=1`,
+`unity.cloud_userid=5ed4029e…`) — nothing in the page writes PlayerPrefs. Between
+two boots in one browser profile the document was then edited from outside:
+`unity.player_session_count` set to **41** and a key of our own, `PluProbe`, added.
+The next boot came back with the count at **42** — the game read 41 out of the
+document, incremented it and wrote it back — with the **same `cloud_userid`**,
+which a player that had lost its prefs would have regenerated, and with `PluProbe`
+still there. `MaVo`, seeded `0.37` in the same edit, came back `0`: the game owns
+that key ([section 20](#20-known-limits)).
+
+**A clean run.** Boot takes ~20–30 s (98 MB of local build, and the loader says so:
+the page shows `LOADING <n>%`). **14 requests, every one of them this folder, 0
+off-machine, 0 exceptions**, only the browser's own `/favicon.ico` probe
+unanswered, `PluStore.stats().lastError` `null`, and the canvas draws the game's
+own menu, which input drives.
+
 ---
 
 ## 7. GameMaker HTML5
@@ -726,6 +828,13 @@ is smaller than the Unity one: each name becomes an `@file` block, and
 `bacon-may-die` is the worked example. It keeps seven files: `items.json`,
 `pig.ini`, `missions.json`, `mods_bmd_custom.ini` and three per-mode
 `save_*.ini`.
+
+`tiny-fishing` is the same engine one generation earlier, and it is a different
+job in three ways worth knowing before starting a GameMaker conversion: its
+runner is a single `tf.js` rather than an `html5game/` folder, its file layer is
+**three** functions rather than four, and its real save is not the file layer at
+all — it is cookies. [Section 7.6](#76-what-the-tiny-fishing-conversion-added)
+is the write-up.
 
 ### 7.1 Load PluStore before the runner
 
@@ -878,6 +987,125 @@ its own key space, which is this runner's shape. Fancade's player is the
 counter-example: it walks `localStorage.key(i)` and rejects any key without its own
 prefix, so stripping it there hides every file from the player while every direct
 read still answers ([section 13.1](#131-the-engines-own-storage-in-two-layers)).
+
+### 7.6 What the Tiny Fishing conversion added
+
+Tiny Fishing is a GameMaker **Studio 1.4** build, and the shape of the job is
+different enough that it reads as a separate recipe.
+
+**It arrived as a page that contained the game rather than one that loaded it.**
+`games/tiny-fishing/index.html` was 2.45 MB whose only real content was an inline
+JSZip copy and one base64 `application/x-zip-compressed` data URI — 1,759,123
+bytes, 37 entries — plus a blob table that replaced every script, image, audio,
+`fetch` and XHR URL with a `blob:` URL *by file name*, and nine script tags
+declared against `khanacademy.org` whose names the zip already held. So the page
+looked like a wrapper of a remote host and was in fact completely self-contained:
+there was no file in it that ever needed the network. Two more inline scripts
+called `gadgets.util.runOnLoadHandlers()` and `window.google.csi.tickDl()` —
+Google-gadget and Khan host calls that threw on every boot — and are gone.
+
+The zip comes apart cleanly, and the extraction is byte-verified against it:
+**36 entries written, every one checked against its own CRC32**. The zip's own
+`index.html` is a four-byte file reading `null`, which is why the page had to
+be written rather than kept.
+
+```bash
+python3 - <<'PY'
+import base64, io, re, zipfile
+src = open('games/tiny-fishing/index.html').read()
+raw = base64.b64decode(re.search(r';base64,([A-Za-z0-9+/=]+)', src).group(1))
+z = zipfile.ZipFile(io.BytesIO(raw))
+z.extractall('games/tiny-fishing')
+PY
+```
+
+**The file layer is three functions, not four, and it writes by property.** In
+this runner they are `_zp1` (write), `_wp1` (read) and `_Fp1` (exists) — there is
+no `removeItem` deleter in the build at all — and the writer stores by
+*assignment*, `window.localStorage[prefix+name] = text`, which is the property
+surface [section 11.6](#116-the-second-surface-localstoragekey) exists for. The
+prefix is `TinyFishing.0.`: the sanitiser (`_de3`) drops every character that is
+not `[A-Za-z0-9_]` from `_Co._dp` ("Tiny Fishing"), then appends a dot, the major
+version field (`_Co._Lo`, 0) and another dot. The three replacements are one line
+each:
+
+```js
+function _zp1(_,t){try{return PluStore.files.write(_,t)}catch(_){return!1}}
+try{i=PluStore.files.read(_)}catch(_){return null}
+try{return PluStore.files.exists(_)?!0:!1}catch(_){return!1}
+```
+
+**The asset base was baked in twice, and both had to go.** The export carried
+`https://<id>.preview.editmysite.com/uploads/b/<id>/files/html5/` as `_l31` — the
+load location every texture, sound, `trads.csv` and dynamic script is built from
+— and again as `_Co._0p`, the field that *overwrites* `_l31` at init unless
+`g_GameMakerHTML5Dir` is defined. Deleting one is not enough, and deleting the
+wrong one leaves the other in charge. Both literals become `""`, so every asset
+resolves against the page and an empty `_0p` leaves the local value alone.
+Setting `window.g_GameMakerHTML5Dir = ''` before the runner would work just as
+well and is one line in the page; the two literals are what this conversion
+removed.
+
+**The real save is cookies, not the file layer.** The game keeps about a hundred
+fields — `Gone FishingmoneyEarned`, `Gone Fishinggems`, `Gone FishingbestScore`,
+`Gone FishingtimerEnergyss`, every fish's `_unlocked`/`_catched`/`_earning` — in
+`document.cookie`, through the `tph_cookieManager.js` extension's `cookieSet`,
+`cookieGet` and `cookieExsists`. The `Gone Fishing` in those names is the project
+name in the extension's own configuration, not the export's `Tiny Fishing`. The
+GameMaker file layer is a *second* plane this game never touches: the only thing
+in the runner that reads it is the built-in hiscore table, and
+`PluStore.files.read('hiscores_data_')` answers `null` after a clean boot.
+
+So this conversion has two planes, both local: `PluStore.files` for the runner's
+three primitives, and `PluStore.webStorage()` for the cookie jar — a cookie jar
+being a flat map of name to string, which is exactly what that area is over
+`@file` blocks. `tph_cookieManager.js` is rewritten to call it. Two details are
+worth keeping in mind:
+
+- **a non-positive lifetime is a deletion**, which is what a browser does with
+expiry in the past, so `cookieSet(name, value, days<=0)` maps to `removeItem`;
+the game's own 100-day expiry is not recorded anywhere, because nothing ever asks
+about it again after setting it;
+- **both planes share one flat name map** in the document. Nothing collides
+(`Gone Fishing*` against `hiscores_data_`) and the game only ever names a cookie,
+never enumerates the jar, so the shared map costs nothing here — an engine that
+listed its key space would need an area of its own ([section 13.1](#131-the-engines-own-storage-in-two-layers)).
+
+What disappeared with the patch is the browser's own jar: a boot now leaves
+`document.cookie` **empty**, where the same boot before the patch wrote about a
+hundred cookies into it.
+
+**One repair to a vendored file.** `yph_djl.js` dereferences
+`document.getElementById('img_loadinglogoicon').style` at load time without a null
+check — `showBH5Icon` is false, so its first act is to hide and remove that
+element — and the page this build shipped in had none of the five loading-screen
+elements it wants. Upstream therefore threw `TypeError: Cannot read properties of
+null (reading 'style')` on every boot, and threw it *twice*, because the runner
+loads the nine extension scripts a second time itself (the build declares them as
+extensions). The fix is one token,
+`if(showBH5Icon==false&&loadingLogoIcon)`; every other use of the same element in
+that file is already guarded. Adding the five elements back would work too and is
+what the export's own `index.html` — the file replaced by a four-byte `null` —
+would have had; the guard is smaller and invents no DOM.
+
+**Verification.** A boot makes 46 requests, every one of them this folder, with
+**0 off-machine requests and 0 exceptions**; the only 404s are the browser's own
+`/favicon.ico`, the loading logo `html5game/load.png` (which the extension asks
+for by name and the zip does not contain — upstream too), and `snd_levCompl`,
+which the build names but does not ship beside `snd_levComplBest.ogg`.
+
+| Check | Result |
+|---|---|
+| document after a clean boot | **4,312 chars, 98 `@file` blocks**, `document.cookie` **0 chars** |
+| writes | **294 document writes** in the boot alone, and one per save after |
+| read | document seeded with `moneyEarned=987654`, `gems=4321`, `bestScore=31337` → the game's own fields give exactly those values back after a reload |
+| write | `moneyEarned` 0 → 3 over three casts, and `timerEnergyss` counting 17, 32, 37, 43, 53, 58 and resetting: live state, not defaults |
+| round trip | play to `money=1`, reload, and it is still **1** — out of the document, with the browser jar empty on both boots |
+
+The gameplay detail matters for anyone re-running it: Tiny Fishing is played by
+clicking to start a run and then pressing and dragging the hook *down*, holding,
+and releasing. A plain click changes the frame (39,784 px against the boot
+frame) but earns nothing; the drag is what catches fish.
 
 ---
 
@@ -2600,8 +2828,9 @@ stripped prefix.
 ## 14. Flash (Ruffle)
 
 `games/duck-life/`, `games/duck-life-2/`, `games/learn-to-fly/`,
-`games/learn-to-fly-2/` and `games/learn-to-fly-3/` are Flash builds — one `.swf`
-each, played by Ruffle, a WASM Flash player. Nothing inside a movie is patched — this is the shortest
+`games/learn-to-fly-2/`, `games/learn-to-fly-3/`,
+`games/the-binding-of-isaac/` and `games/the-worlds-hardest-game/` are Flash builds
+— one `.swf` each, played by Ruffle, a WASM Flash player. Nothing inside a movie is patched — this is the shortest
 conversion in the document — but two things about Ruffle are not obvious: the key
 its saves are named by, and the fact that its save is already `localStorage`. Each
 later game is written up alongside the first because it taught something the
@@ -2615,7 +2844,13 @@ a save, and why a Learn-to-Fly-family round trip may prove only equivalence), an
 [section 14.12](#1412-what-the-fifth-conversion-added) (a save whose fields are
 objects rather than numbers, and a movie that hands the seeded values back), and
 [section 14.13](#1413-what-the-sixth-conversion-added) (a movie that puts *no
-movie name* in its key at all, so the mapper has to narrow a different part).
+movie name* in its key at all, so the mapper has to narrow a different part), and
+[section 14.14](#1414-what-the-seventh-conversion-added) (a movie with no telemetry
+at all, whose key is the same *localPath* shape and whose save was patched in its
+own bytes to prove the read), and
+[section 14.15](#1415-what-the-eighth-conversion-added) (a movie with **no save at
+all**, and the two controls that make "it never asks" a measurement rather than an
+assumption).
 
 ### 14.1 The save is a SharedObject, and Ruffle's backend is localStorage
 
@@ -2815,10 +3050,15 @@ next boot and survived there.
   confirm both that Ruffle is handed exactly those bytes and that the game's own
   variables keep them.
 
-Three further Ruffle wrappers are in this repo still on the old bridge
-(`motox3m-3`, `the-binding-of-isaac`, `the-worlds-hardest-game`). Each needs the
-same three things: the player vendored, `installSharedObjects('<movie>.swf')`
-before it, and the movie named correctly.
+There is no Ruffle wrapper left on the old bridge: every Flash page in this repo
+has the player vendored, `installSharedObjects('<movie>.swf')` before it, and the
+movie named correctly — and with `ultrakill` converted
+([section 6.10](#610-what-the-ultrakill-conversion-added)) **no page in the
+catalogue loads `js/sync.js` at all.**
+
+The one class of Flash build that needs a different check is a movie with **no
+save at all** — [section 14.15](#1415-what-the-eighth-conversion-added) — where
+the round trip above has nothing to prove and two controls take its place.
 
 ### 14.9 What the second conversion added
 
@@ -3144,6 +3384,145 @@ before it and `js/sync.js` gone. Its save is a *profile* — the method names sa
 the slot name is `LTF3`, read off its constant pool. Its movie is 720×540 (4:3);
 the wrapper it replaces carried the shared template's 5.5/3 box, which stretched
 the picture, so the page uses the movie's own ratio like its sibling.
+
+---
+
+### 14.14 What the seventh conversion added
+
+The Binding of Isaac is the seventh Ruffle conversion, and it is the plainest
+example of the *localPath* key shape [section 14.13](#1413-what-the-sixth-conversion-added)
+turned up. `games/the-binding-of-isaac/` is a Flash port of Isaac — one
+`BiWrath.swf`, 9,235,961 bytes on the wire, `CWS` (zlib), SWF v8, declared
+uncompressed length 11,946,805, stage **800×600** at 30 fps over 41 frames. Three
+things about it are worth writing down.
+
+**Its slot name has no movie in it at all.** The movie's constant pool spells the
+call out — `so`, `/`, `SharedObject`, `getLocal`, `clear` and `flush` sit next to
+each other — so it is `SharedObject.getLocal("so", "/")`, and the key Ruffle
+composes is
+
+    127.0.0.1//so
+
+which is the localPath shape, not the movie-shaped one. The mapper drops the host,
+so the document's key is just `/so`. That distinction has to be right before
+anything is written: seeding the movie-shaped guess `BiWrath.swf/so` puts a block
+in the document that the movie never asks for, and the two then sit side by side
+looking equally plausible — measured here, in one document, before the right name
+was known. `installSharedObjects('BiWrath.swf')` handles both shapes, so the page
+does not care; it is only a hand edit that has to know which one it is.
+
+**No telemetry, so the guard has nothing to refuse.** Searched exhaustively, this
+movie has **no URL string in it at all**: no MochiAds preloader, no Kongregate or
+Newgrounds SDK, no high-score endpoint. It is the first Flash conversion here where
+a boot refused nothing and reached nothing — 7 requests, every one of them this
+folder, and the only 404 is the browser's own `/favicon.ico` probe. The guard is
+still in the page, because "the page must not be able to leave the machine" is a
+property of the conversion and not of today's movie.
+
+**Both directions, with the movie's own bytes as the seed.** On a clean install the
+player reads its slot and gets `undefined` — there is no save yet — writes nothing
+at all while the page is up, and the document appears only when the page goes away:
+Ruffle's flush, exactly as [section 14.7](#147-reading-the-save-and-applying-one-from-outside)
+describes. Document 0 → 1,493 bytes, one `@file /so` block, and the movie's own
+field names are legible inside it — `MEDIUM wins icer shits pill dde gams bomb
+deads rocks cols lock lockor ulock boss lcomp mwin moff`. Then, from a page that was
+*not* running the movie, one field was patched in its own bytes: `MEDIUM` → `LOLWUT`,
+in the base64 spelling and at the same length, so the LSO stays structurally valid.
+The next boot's read came back **1400 chars, marker present** — the first value this
+movie ever read was one only the document had.
+
+Two smaller notes. The published page had the same unfilled `player.load("$1")` as
+its siblings ([section 14.2](#142-load-plustore-before-ruffleminjs)), so the movie
+was never handed over at all; its `<Module>`/`<CDATA>` envelope and an inert
+`<param>`/`<embed>` pair went with it. And the wrapper's 5.5/3 box stretched this
+movie the way it stretched the Learn to Fly family — the movie's own 800×600 is what
+the page uses now.
+
+One limit on the pull. The movie came from a pinned jsDelivr copy of
+`RobiFet/CMinterview@a4017231eca9f2173ad7ec0e63b01e4786b4ad6b`, and **GitHub's API
+answers 404 for that repository**, so its tree cannot be read and there is no blob
+sha to verify against. The pin is the one upstream fact available — the CDN's own
+`X-JSD-Version` header names the commit — so the bytes are checked by length and by
+a recorded hash instead:
+`4e828f8f0eb5dda3f92e71f2ce1c07576e0b531bf74ba0ab9c936be2b153c802`.
+
+### 14.15 What the eighth conversion added
+
+The World's Hardest Game is the eighth Ruffle conversion, and it is the first
+Flash build here with **no save at all**. `games/the-worlds-hardest-game/` is one
+`wordes-hardest-gae.swf`: 744,124 bytes on the wire, `CWS` (zlib), SWF v8, declared
+uncompressed length 997,983, stage **550×400** at 30 fps over 180 frames.
+
+The inflated movie contains **no `SharedObject`, no `getLocal` and no `flush`
+string anywhere in its constant pool**. What it has instead is `highscoreObject` —
+and the call spelled out beside it is `LoadVars` → `send(url, "_blank", "POST")`.
+So there is no slot to key, no round trip to run, and nothing that could be seeded:
+the movie is a game that keeps its progress in memory and posts a score when a run
+is over. (It is the same *story* as the no-save Construct 3 build of
+[section 8.9](#89-a-build-with-no-save-at-all) — a build whose object types have no
+storage plugin — reached from the opposite direction: there, the engine had no way
+to save; here, the movie never asks.)
+
+**What it does carry is a live endpoint, which no earlier Flash conversion had.**
+Seven URL strings: the high-score submit and five `getURL` link buttons on the menu
+(`armorgames.com` twice, `snayk.newgrounds.com`, `flashkit.com`, `snubbyland.com`),
+which only act when the player clicks them. No MochiAds preloader, no Kongregate
+SDK. The submit is the first real outbound request in a Ruffle conversion here, and
+the guard of [section 14.6](#146-the-calls-that-leave-the-machine-and-the-guard-that-stops-them)
+refuses it:
+
+    fetch('http://www.snubbyland.com/highscores_theWorldsHardestGame.php', {method:'POST'})
+      → refused: The World's Hardest Game: only this folder is reachable (…)
+
+measured from the page against that exact URL, with a warning in the console and
+nothing reaching the network. What that does *not* prove is the movie's own click:
+its submit fires only from its score-submission path, which a driven menu did not
+reach. What makes a plain refusal safe there is in the constant pool — the movie's
+`LoadVars` has **no `onLoad` handler anywhere**, so no behaviour can depend on the
+answer. It is the opposite case to a host SDK that needs a reply
+([section 6.7](#67-refuse-a-request-and-answer-it)): nothing to answer, so nothing
+is answered.
+
+**Two controls, because there is no save to look at.**
+
+1. *The movie never asks.* The instrumented area of [section 14.9](#149-what-the-second-conversion-added)
+   records **zero reads and zero writes** across a boot, two menu clicks and twelve
+   seconds of arrow-key play — where Duck Life's single boot alone is nine writes.
+   `PluStore.stats()` on the same run reports `fileWrites 0`, `storeWrites 0`,
+   `lastError null` (the clean install), the document stays 0 chars and
+   `localStorage` stays empty.
+2. *The swap is live anyway.* Writing through the installed area —
+   `window.localStorage['probe.key'] = 'written-through-the-area'` — lands in the
+   document as `@file probe.key` and reads back out of it. Without this, "the movie
+   never asks" and "the adapter is dead" are the same observation, which is the
+   trap [section 8.9](#89-a-build-with-no-save-at-all) names for a no-save build.
+   (Under the logging Proxy, PluStore prints its own "could not be replaced; the
+   save would not be ours" — that is the probe's warning, not the page's,
+   [section 14.9](#149-what-the-second-conversion-added).)
+
+**And a control for the movie itself.** The same movie, at the same canvas size,
+given the same clicks and keys, in a page with **no PluStore at all** renders
+*bit-identical* frames at every stage: boot, after the first menu click, and after
+twelve seconds of play — **0 of 880,000 pixels differ** at each of the three. That
+is the strongest form the "the conversion is invisible to the game" check can take,
+and it is available to a no-save build precisely because there is no storage state
+to diverge.
+
+Smaller things, all of them the wrapper's and none of them this game's: the
+unfilled `player.load("$1")` placeholder again, the `<Module>`/`<CDATA>` envelope,
+an inert `<param>`/`<embed>` pair pointing at the CDN, and the wrapper's 5.5/3 box
+stretching a movie whose own stage is 550×400 (11/8) — the header value the page
+uses now. The title was `really cool flash game`; it is the game's name now.
+
+**The pull is fully verified.** The movie came from a pinned jsDelivr copy of
+`sonvallhall/x7x@51cffb21c08c2ca9cecbed7aecf10d1afb8b9c72`, and GitHub's API
+*does* answer for that repository, so the file is checked against the tree's own git
+blob sha: `bdd39685c31307af050ef62582cbff1b601dba6e`, 744,124 bytes,
+sha256 `ee125fff640942ee4cb72a4a195e931b8d6a8bb6a3f6fce268fd8c8d7e0f91a8`. The
+folder is 9 files / 26 MB, all of that Ruffle (both core pairs, vendored from the
+same release the other Flash pages use). A boot makes 6 requests, every one of them
+this folder, plus the browser's own `/favicon.ico` 404; **0 off-machine requests,
+0 exceptions**.
 
 ---
 
@@ -3705,7 +4084,7 @@ needs to change.
 
 | Call | Does |
 |---|---|
-| `configure({game, key, mount, filePrefix, backend})` | set up before the game loads |
+| `configure({game, key, mount, filePrefix, skip, backend})` | set up before the game loads; `skip` is a list of path prefixes or regular expressions the document never keeps |
 | `installSharedObjects(movie)` | the Web Storage area, with Ruffle's host-shaped SharedObject keys narrowed to `"<movie>/<name>"` |
 | `get()` | the whole save as a string |
 | `set(doc)` | validate, store, and broadcast a document |
@@ -3767,6 +4146,13 @@ is what makes a re-encode safe to hand back.
   would be two saves ([section 14.3](#143-the-key-ruffle-composes-and-why-the-movie-is-named)).
   `installSharedObjects(movie)` narrows it, and the movie argument is not
   optional bookkeeping: leave it out and the save follows the hostname again.
+- **An engine's telemetry shares the save's filesystem.** A Unity build with the
+  Analytics service compiled in queues its events beside the player's own files —
+  five per event, carrying a user id and an identity token — so the save grows a
+  few kilobytes every session unless the page says otherwise
+  ([section 6.10](#610-what-the-ultrakill-conversion-added)). `skip` leaves them
+  out of the *document*; the game still writes them into the in-memory
+  filesystem, and it is the document that is the save.
 - **A game can own the key you edit.** A round trip is proven with a key no game
   code touches — after the reload the player rewrites its file, and an injected
   unknown entry survives that, which is what says the file was seeded from the
@@ -3958,6 +4344,14 @@ is what makes a re-encode safe to hand back.
 - **`@file test` in a Web Storage game is not a save.** It is the game's own
   capability probe (`localStorage.setItem('test', 0)`), stored like any other
   write. Harmless, and worth not deleting: it is how you know the area swap took.
+- **A two-plane build has to be checked on both planes.** Tiny Fishing's real
+  save is its cookie jar; the GameMaker file layer it also carries is a plane the
+  game never writes to (the only reader of it in the runner is the built-in
+  hiscore table). A conversion that routes just the documented file layer leaves
+  the actual save in the browser, and the document looks healthy either way —
+  98 `@file` blocks of defaults against the same 98 carrying progress
+  ([section 7.6](#76-what-the-tiny-fishing-conversion-added)). Check a value that
+  the game itself earned.
 
 ---
 

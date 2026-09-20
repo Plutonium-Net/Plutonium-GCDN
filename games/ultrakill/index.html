@@ -1,109 +1,186 @@
 <!DOCTYPE html>
-
-
-<!-- Pluto Game 9/11/2026 -->
-
-
 <html lang="en-us">
 
 <head>
-<script src="../../js/sync.js"></script>
-    <base href="https://cdn.jsdelivr.net/gh/genizy/web-port@master/ultrakill/">
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | ULTRAKILL</title>
-    <style>
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            height: 100%;
-            width: 100%;
-        }
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+  <title>ULTRAKILL</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+    }
 
-        #unity-container {
-            width: 100%;
-            height: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
+    #unity-container {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+    }
+  </style>
+
+  <!-- The save. This is a Unity WebGL build, so the game's PlayerPrefs (and
+       anything it writes to persistentDataPath) lives in the player's /idbfs
+       mount, and the two functions that keep it are PluStore.boot and
+       PluStore.flush (STORAGE.md section 6).
+
+       This is the modern "autoPersist" layout rather than the 2018/2019 one, so
+       the mount is the only place persistence is switched on - IDBFS itself is
+       wrapped by the player's own injectIndexedDBToAutomaticallyPersist() - and
+       three sites in the framework were cut over: the mount, the periodic tick,
+       and the manual JS_FileSystem_Sync call.
+
+       PluStore has to be up before the loader runs, because the framework is
+       evaluated inside createUnityInstance() and mounts /idbfs the moment it
+       starts. -->
+  <script src="../../js/plustore.js"></script>
+  <script>
+    /* `skip` leaves the build's telemetry out of the save. This one has Unity's
+       Analytics service compiled in (its project id is baked into the player
+       and every event it queues carries a user id and an identity token), so
+       on top of its PlayerPrefs the player writes a tree of
+       /idbfs/<hash>/Unity/<project id>/Analytics/ArchivedEvents/<event>/ files
+       — a few kilobytes of them per session, waiting for an endpoint the guard
+       below refuses. They are not the save and the game never reads them back,
+       so the document keeps the PlayerPrefs and drops the rest. */
+    PluStore.configure({
+      game: 'ultrakill',
+      skip: [/\/Unity\/[0-9a-f-]{36}\/Analytics(\/|$)/]
+    });
+
+    /* The guard. The published page was a wrapper around a jsDelivr folder -
+       <base href="https://cdn.jsdelivr.net/gh/genizy/web-port@master/ultrakill/">
+       - which is dead twice over today: the repository renamed its branch to
+       main, and jsDelivr answers 403 for that whole user. The build is local
+       now, and nothing here may leave the machine.
+
+       Unity's loader fetches its framework, its data and its wasm through
+       fetch/XHR, so both are guarded; the element surfaces are guarded too,
+       because a Unity build can still set a script src or an image src from a
+       string it composes. A refused request is answered with the same-origin
+       spelling of its path, which this folder does not have either: the loader
+       treats that as a failed file, which is how it would see a 404. */
+    (function () {
+      if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+      var here = location.protocol + '//' + location.host;
+      var refused = [];
+
+      function local(url) {
+        try {
+          var u = new URL(url, here);
+          if (u.protocol === 'data:' || u.protocol === 'blob:') return true;
+          return u.protocol + '//' + u.host === here;
+        } catch (e) {
+          return false;
         }
-    </style>
-  
+      }
+
+      function refuse(what, url) {
+        var key = what + ' ' + url;
+        if (refused.indexOf(key) < 0) {
+          refused.push(key);
+          console.warn('ULTRAKILL: refused ' + what + ' outside this folder: ' + url);
+        }
+        try {
+          return location.origin + new URL(url, here).pathname;
+        } catch (e) {
+          return here + '/';
+        }
+      }
+
+      var realFetch = window.fetch;
+      window.fetch = function (input, init) {
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (local(url)) return realFetch.apply(this, arguments);
+        return Promise.reject(new TypeError('ULTRAKILL: only this folder is reachable (' + refuse('fetch', url) + ')'));
+      };
+
+      var realOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        var rest = [].slice.call(arguments, 2);
+        if (!local(url)) url = refuse('request', url);
+        return realOpen.apply(this, [method, url].concat(rest));
+      };
+
+      function guardURL(proto, prop, what) {
+        var desc = Object.getOwnPropertyDescriptor(proto, prop);
+        if (!desc || !desc.set) return;
+        Object.defineProperty(proto, prop, {
+          configurable: true,
+          enumerable: desc.enumerable,
+          get: desc.get,
+          set: function (value) {
+            if (typeof value === 'string' && !local(value)) value = refuse(what, value);
+            return desc.set.call(this, value);
+          },
+        });
+      }
+      guardURL(HTMLScriptElement.prototype, 'src', 'script');
+      guardURL(HTMLLinkElement.prototype, 'href', 'stylesheet');
+      guardURL(HTMLImageElement.prototype, 'src', 'image');
+      guardURL(HTMLMediaElement.prototype, 'src', 'audio');
+    })();
+  </script>
 </head>
 
 <body style="text-align: center; padding: 0; border: 0; margin: 0;">
-    <div id='loading-text' style="color: black; font-family: cursive; font-size: 48px; text-align: center; margin-top: 20px;">LOADING...</div>
-    <canvas id="unity-canvas" tabindex="-1" hidden></canvas>
-    <script src="Build/ultrakill.loader.js"></script>
-    <script>
-        var canvas = document.querySelector("#unity-canvas");
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            var meta = document.createElement('meta');
-            meta.name = 'viewport';
-            meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-            document.getElementsByTagName('head')[0].appendChild(meta);
-            canvas.style.width = "100%";
-            canvas.style.height = "100%";
-            canvas.style.position = "fixed";
-            document.body.style.textAlign = "left";
-        } else {
-            function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-                canvas.style.width = window.innerWidth + "px";
-                canvas.style.height = window.innerHeight + "px";
-            }
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-        }
+  <div id='loading-text' style="color: black; font-family: cursive; font-size: 48px; text-align: center; margin-top: 20px;">LOADING...</div>
+  <canvas id="unity-canvas" tabindex="-1" hidden></canvas>
 
-        function mergeFiles(fileParts) {
-            return new Promise((resolve, reject) => {
-                let buffers = [];
+  <!-- The loader, local. The published page took the whole build from a moving
+       <base href> and merged the split data and wasm at run time with a
+       fetch/blob helper; the parts are concatenated on disk now - one 73 MB
+       data file from four parts, one 24 MB wasm from two - so there is nothing
+       left to merge and no blob URLs in the path. -->
+  <script src="Build/ultrakill.loader.js"></script>
+  <script>
+    var canvas = document.querySelector("#unity-canvas");
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      var meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+      document.getElementsByTagName('head')[0].appendChild(meta);
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.position = "fixed";
+      document.body.style.textAlign = "left";
+    } else {
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.width = window.innerWidth + "px";
+        canvas.style.height = window.innerHeight + "px";
+      }
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+    }
 
-                function fetchPart(index) {
-                    if (index >= fileParts.length) {
-                        let mergedBlob = new Blob(buffers);
-                        let mergedFileUrl = URL.createObjectURL(mergedBlob);
-                        resolve(mergedFileUrl);
-                        return;
-                    }
-                    fetch(fileParts[index]).then((response) => response.arrayBuffer()).then((data) => {
-                        buffers.push(data);
-                        fetchPart(index + 1);
-                    }).catch(reject);
-                }
-                fetchPart(0);
-            });
-        }
-
-        function getParts(file, start, end) {
-            let parts = [];
-            for (let i = start; i <= end; i++) {
-                parts.push(file + ".part" + i);
-            }
-            return parts;
-        }
-        Promise.all([
-            mergeFiles(getParts("Build/ultrakill.data.unityweb", 1, 4)),
-            mergeFiles(getParts("Build/ultrakill.wasm.unityweb", 1, 2))
-        ]).then(([dataUrl, wasmurl]) => {
-            document.querySelector("#unity-canvas").hidden = false;
-            createUnityInstance(document.querySelector("#unity-canvas"), {
-                dataUrl: dataUrl,
-                frameworkUrl: "Build/ultrakill.framework.js.unityweb",
-                codeUrl: wasmurl,
-                streamingAssetsUrl: "StreamingAssets",
-                companyName: "Hakita and Cake Logic",
-                productName: "ULTRAKILL",
-                productVersion: "1.4",
-            }).then((e) => {
-                document.querySelector("#loading-text").remove();
-            });
-        });
-    </script>
+    canvas.hidden = false;
+    createUnityInstance(canvas, {
+      dataUrl: "Build/ultrakill.data.unityweb",
+      frameworkUrl: "Build/ultrakill.framework.js.unityweb",
+      codeUrl: "Build/ultrakill.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Hakita and Cake Logic",
+      productName: "ULTRAKILL",
+      productVersion: "1.4",
+    }, function (progress) {
+      /* The published page showed a static LOADING... and never said how far
+         along it was; this build is 98 MB of local files, so the number is
+         worth having. */
+      var text = document.querySelector('#loading-text');
+      if (text) text.textContent = 'LOADING ' + Math.round(progress * 100) + '%';
+    }).then(function () {
+      var text = document.querySelector('#loading-text');
+      if (text) text.remove();
+    });
+  </script>
 </body>
 
 </html>

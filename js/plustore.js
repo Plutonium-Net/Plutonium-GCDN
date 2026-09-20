@@ -36,6 +36,17 @@
        It is bookkeeping, not part of the save, so it never reaches the
        document. Empty means names arrive bare, which is the common case. */
     filePrefix: '',
+    /* Paths the document never keeps. A Unity build with the Analytics service
+       compiled in queues its telemetry in the same filesystem as the save —
+       /Unity/<project id>/Analytics/ArchivedEvents/... — and those files are
+       neither the player's save nor anything the game reads back; they only
+       make the document longer every session. An entry is a path prefix
+       (string) or a regular expression, matched against the path the player
+       walked to, and a match drops the file and everything under it.
+
+       Empty by default: a game keeps exactly what it writes unless its page
+       says otherwise. */
+    skip: [],
     backend: null // filled in below
   };
 
@@ -459,6 +470,24 @@
     return a.charAt(a.length - 1) === '/' ? a + b : a + '/' + b;
   }
 
+  /* Does this page want the path left out of the document? A string is a
+     prefix, a regular expression is a pattern; either drops the whole subtree
+     below a match, so the walk never descends into it. */
+  function skipped(path) {
+    var rules = cfg.skip;
+    if (!rules || !rules.length) return false;
+    for (var i = 0; i < rules.length; i++) {
+      var rule = rules[i];
+      if (typeof rule === 'string') {
+        if (path.indexOf(rule) === 0) return true;
+      } else if (rule && typeof rule.test === 'function') {
+        if (rule.global) rule.lastIndex = 0; // test() would otherwise alternate
+        if (rule.test(path)) return true;
+      }
+    }
+    return false;
+  }
+
   function readTree(FS, mount) {
     var tree = { dirs: [], files: [] };
 
@@ -468,6 +497,7 @@
       for (var i = 0; i < names.length; i++) {
         if (names[i] === '.' || names[i] === '..') continue;
         var full = pathJoin(dir, names[i]);
+        if (skipped(full)) continue;
         var stat;
         try { stat = FS.stat(full); } catch (e) { continue; }
 
